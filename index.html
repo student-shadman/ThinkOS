@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThinkOS — Decision Intelligence Workspace</title>
+<style>
+:root{
+  --accent:#4FD8C0; --accent-ink:#06241D;
+  --success:#79D88B; --warn:#EFB54B; --danger:#F2654F; --info:#6FA8E0;
+  --radius:10px; --radius-sm:6px;
+  --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --sidebar-w: 232px; --context-w: 300px; --topbar-h: 52px; --status-h: 28px;
+}
+[data-theme="dark"]{
+  --bg:#0A0E14; --bg-elev:#0F141B; --panel:#11161E; --panel-2:#1A222C; --panel-3:#212B37;
+  --border:#232B36; --border-soft:#1A212B;
+  --text-1:#ECEFF3; --text-2:#A6AFBC; --text-3:#6B7480;
+  --shadow: 0 8px 24px rgba(0,0,0,.45);
+}
+[data-theme="light"]{
+  --bg:#FAFAF8; --bg-elev:#FFFFFF; --panel:#FFFFFF; --panel-2:#F1F2EF; --panel-3:#E9EAE6;
+  --border:#E3E4E0; --border-soft:#ECEDEA;
+  --text-1:#1B1F24; --text-2:#5B6270; --text-3:#8B919C;
+  --shadow: 0 8px 24px rgba(20,20,15,.10);
+  --accent:#0FA98A; --success:#3FAE5C; --warn:#C2811A; --danger:#D6432E; --info:#3E78B5;
+}
+[data-theme="contrast"]{
+  --bg:#000000; --bg-elev:#000000; --panel:#000000; --panel-2:#0A0A0A; --panel-3:#161616;
+  --border:#FFFFFF; --border-soft:#777777;
+  --text-1:#FFFFFF; --text-2:#FFFFFF; --text-3:#CFCFCF;
+  --accent:#FFD400; --success:#5CFF8E; --warn:#FFD400; --danger:#FF6B57; --info:#7FD1FF;
+  --shadow: none;
+}
+[data-colorblind="true"]{
+  --success:#3E8FD0; --danger:#E07B1A; --warn:#8E6FD4; --info:#3E8FD0;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:var(--bg); color:var(--text-1); font-family:var(--font-body);
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button{font-family:inherit;cursor:pointer;}
+input,textarea,select{font-family:inherit;font-size:14px;color:var(--text-1);background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);}
+a{color:var(--accent);text-decoration:none;}
+::selection{background:var(--accent);color:var(--accent-ink);}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.hidden{display:none !important;}
+.scroll{overflow-y:auto;}
+.scroll::-webkit-scrollbar{width:8px;height:8px;}
+.scroll::-webkit-scrollbar-thumb{background:var(--panel-3);border-radius:4px;}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important;}}
+
+/* ---------- App Shell ---------- */
+#app{display:grid;grid-template-columns:var(--sidebar-w) 1fr; grid-template-rows: var(--topbar-h) 1fr var(--status-h); height:100vh; width:100vw;}
+#sidebar{grid-row:1/4; grid-column:1; background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; transition:margin-left .18s ease, width .18s ease;}
+#sidebar.collapsed{margin-left:calc(-1 * var(--sidebar-w));}
+#topbar{grid-row:1; grid-column:2; background:var(--bg-elev); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; padding:0 16px;}
+#main-grid{grid-row:2; grid-column:2; display:grid; grid-template-columns:1fr; overflow:hidden;}
+#main-grid.with-context{grid-template-columns:1fr var(--context-w);}
+#workspace{overflow-y:auto; padding:28px 32px 60px; position:relative;}
+#context-panel{border-left:1px solid var(--border); background:var(--panel); overflow-y:auto; padding:18px;}
+#statusbar{grid-row:3; grid-column:2; background:var(--panel); border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 16px; font-size:11.5px; color:var(--text-3); font-family:var(--font-mono);}
+
+/* Sidebar */
+.brand{display:flex;align-items:center;gap:9px;padding:16px 16px 14px;}
+.brand-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(145deg,var(--accent),transparent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-mark svg{width:15px;height:15px;}
+.brand-name{font-family:var(--font-display);font-size:17px;letter-spacing:.2px;}
+.brand-sub{font-size:10px;color:var(--text-3);font-family:var(--font-mono);letter-spacing:.5px;text-transform:uppercase;margin-top:-2px;}
+.nav-scroll{flex:1;overflow-y:auto;padding:4px 10px 10px;}
+.nav-group-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--text-3);padding:14px 10px 6px;font-family:var(--font-mono);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--radius-sm);color:var(--text-2);font-size:13px;margin-bottom:1px;position:relative;}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.85;}
+.nav-item:hover{background:var(--panel-2);color:var(--text-1);}
+.nav-item.active{background:var(--panel-2);color:var(--text-1);}
+.nav-item.active::before{content:'';position:absolute;left:-10px;top:8px;bottom:8px;width:2px;background:var(--accent);border-radius:2px;}
+.nav-item .count{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--text-3);}
+.sidebar-foot{padding:10px;border-top:1px solid var(--border-soft);}
+
+/* Topbar */
+.icon-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius-sm);background:transparent;border:1px solid transparent;color:var(--text-2);}
+.icon-btn:hover{background:var(--panel-2);border-color:var(--border);color:var(--text-1);}
+.icon-btn svg{width:16px;height:16px;}
+#search-trigger{flex:1;max-width:420px;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--panel-2);border:1px solid var(--border);color:var(--text-3);font-size:13px;}
+#search-trigger kbd{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;background:var(--panel-3);padding:2px 5px;border-radius:4px;border:1px solid var(--border);}
+.topbar-spacer{flex:1;}
+.topbar-actions{display:flex;align-items:center;gap:6px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--panel-2);color:var(--text-1);font-size:13px;font-weight:500;}
+.btn:hover{border-color:var(--text-3);}
+.btn-primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-danger{color:var(--danger);}
+.btn svg{width:14px;height:14px;}
+.btn.sm{padding:4px 9px;font-size:12px;}
+
+/* Workspace typography */
+h1.page-title{font-family:var(--font-display);font-size:26px;font-weight:600;margin:0 0 4px;letter-spacing:.2px;}
+.page-sub{color:var(--text-2);font-size:13px;margin:0 0 24px;}
+.eyebrow{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-3);margin-bottom:6px;}
+.section-divider{display:flex;align-items:center;gap:8px;margin:30px 0 14px;color:var(--text-3);font-size:11px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.6px;}
+.section-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.section-divider .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);}
+
+/* Grids & Cards */
+.grid{display:grid;gap:14px;}
+.grid-cards{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));}
+.grid-2{grid-template-columns:1fr 1fr;}
+.grid-stats{grid-template-columns:repeat(auto-fill,minmax(165px,1fr));}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:border-color .15s,transform .15s;}
+.card.hoverable:hover{border-color:var(--text-3);transform:translateY(-1px);}
+.card.clickable{cursor:pointer;}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.stat-card .stat-label{font-size:11px;color:var(--text-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.5px;}
+.stat-card .stat-value{font-family:var(--font-display);font-size:28px;margin-top:4px;}
+.stat-card .stat-delta{font-size:11.5px;margin-top:3px;color:var(--text-2);}
+.stat-card .stat-delta.up{color:var(--success);}
+.stat-card .stat-delta.down{color:var(--danger);}
+
+/* Badges & Pills */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;font-family:var(--font-mono);letter-spacing:.2px;border:1px solid transparent;}
+.badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.badge.b-neutral{background:var(--panel-3);color:var(--text-2);}
+.badge.b-success{background:color-mix(in srgb, var(--success) 18%, transparent);color:var(--success);}
+.badge.b-warn{background:color-mix(in srgb, var(--warn) 18%, transparent);color:var(--warn);}
+.badge.b-danger{background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger);}
+.badge.b-info{background:color-mix(in srgb, var(--info) 18%, transparent);color:var(--info);}
+.badge.b-accent{background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent);}
+.tag-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:99px;font-size:11.5px;background:var(--panel-3);color:var(--text-2);border:1px solid var(--border-soft);}
+.tag-row{display:flex;flex-wrap:wrap;gap:6px;}
+
+/* Confidence Ring (signature element) */
+.ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;}
+.ring-wrap svg{transform:rotate(-90deg);}
+.ring-track{fill:none;stroke:var(--panel-3);}
+.ring-fill{fill:none;stroke:var(--accent);stroke-linecap:round;transition:stroke-dashoffset .5s ease;}
+.ring-label{position:absolute;font-family:var(--font-mono);font-weight:700;}
+
+/* Lists */
+.list-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:var(--radius-sm);border:1px solid transparent;}
+.list-item:hover{background:var(--panel-2);}
+.list-item .li-title{font-weight:600;font-size:13.5px;}
+.list-item .li-meta{font-size:11.5px;color:var(--text-3);}
+.divide > * + *{border-top:1px solid var(--border-soft);}
+
+/* Buttons in lists / repeatable items (decomposition sections) */
+.repeat-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.repeat-item{display:flex;align-items:flex-start;gap:8px;background:var(--panel-2);border:1px solid var(--border-soft);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;}
+.repeat-item .ri-text{flex:1;word-break:break-word;}
+.repeat-item .ri-del{flex-shrink:0;color:var(--text-3);background:none;border:none;font-size:15px;line-height:1;}
+.repeat-item .ri-del:hover{color:var(--danger);}
+.repeat-add{display:flex;gap:6px;margin-top:8px;}
+.repeat-add input{flex:1;padding:7px 9px;}
+
+/* Forms */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11.5px;color:var(--text-2);margin-bottom:5px;font-weight:600;letter-spacing:.2px;}
+.field input,.field textarea,.field select{width:100%;padding:8px 10px;}
+.field textarea{resize:vertical;min-height:64px;}
+.field-row{display:flex;gap:12px;}
+.field-row .field{flex:1;}
+.hint{font-size:11px;color:var(--text-3);margin-top:4px;}
+input[type=range]{padding:0;background:transparent;}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.tab{padding:9px 14px;font-size:13px;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab:hover{color:var(--text-1);}
+.tab.active{color:var(--text-1);border-color:var(--accent);font-weight:600;}
+
+/* Filters bar */
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px;}
+.filter-bar select,.filter-bar input{padding:6px 9px;font-size:12.5px;}
+.seg{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+.seg button{padding:6px 11px;background:var(--panel);border:none;color:var(--text-2);font-size:12.5px;border-right:1px solid var(--border);}
+.seg button:last-child{border-right:none;}
+.seg button.active{background:var(--panel-3);color:var(--text-1);font-weight:600;}
+
+/* Empty states */
+.empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;padding:50px 20px;color:var(--text-2);}
+.empty-state .es-icon{width:38px;height:38px;color:var(--text-3);margin-bottom:14px;opacity:.7;}
+.empty-state h3{font-family:var(--font-display);font-size:17px;color:var(--text-1);margin:0 0 6px;}
+.empty-state p{font-size:13px;max-width:340px;margin:0 0 16px;}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;padding-top:8vh;z-index:200;backdrop-filter:blur(2px);}
+.modal{background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);width:560px;max-width:92vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow);animation:modalIn .15s ease;}
+@keyframes modalIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);}
+.modal-head h3{font-family:var(--font-display);font-size:17px;margin:0;}
+.modal-body{padding:18px;overflow-y:auto;flex:1;}
+.modal-foot{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+
+/* Command Palette */
+#cmdk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;z-index:300;}
+#cmdk{width:560px;max-width:90vw;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;animation:modalIn .12s ease;}
+#cmdk-input{width:100%;border:none;border-bottom:1px solid var(--border);padding:14px 16px;font-size:15px;background:transparent;border-radius:0;}
+#cmdk-results{max-height:360px;overflow-y:auto;padding:6px;}
+.cmdk-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius-sm);font-size:13px;}
+.cmdk-item svg{width:14px;height:14px;color:var(--text-3);}
+.cmdk-item.sel{background:var(--panel-2);}
+.cmdk-group{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--text-3);padding:8px 10px 2px;font-family:var(--font-mono);}
+
+/* Toasts */
+#toast-stack{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:400;}
+.toast{display:flex;align-items:center;gap:9px;background:var(--bg-elev);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;box-shadow:var(--shadow);min-width:220px;animation:toastIn .18s ease;}
+@keyframes toastIn{from{opacity:0;transform:translateX(8px);}to{opacity:1;transform:translateX(0);}}
+.toast .t-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+/* Risk Matrix */
+.risk-matrix{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;max-width:480px;}
+.risk-cell{aspect-ratio:1;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;color:var(--text-2);position:relative;}
+.risk-cell .rc-count{font-weight:700;font-size:13px;color:var(--text-1);}
+
+/* Fishbone */
+.fishbone-wrap{overflow-x:auto;padding:10px 0;}
+.fishbone-cats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;min-width:760px;}
+.fishbone-cat{background:var(--panel-2);border:1px solid var(--border-soft);border-radius:var(--radius-sm);padding:10px;min-height:120px;}
+.fishbone-cat h4{margin:0 0 8px;font-size:12px;color:var(--accent);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.4px;}
+
+/* 5 Whys chain */
+.whys-chain{display:flex;flex-direction:column;gap:0;}
+.why-step{display:flex;gap:12px;}
+.why-rail{display:flex;flex-direction:column;align-items:center;width:24px;}
+.why-num{width:22px;height:22px;border-radius:50%;background:var(--panel-3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--font-mono);flex-shrink:0;}
+.why-line{flex:1;width:1px;background:var(--border);min-height:18px;}
+.why-body{flex:1;padding-bottom:14px;}
+.why-body textarea{width:100%;}
+
+/* Solutions compare table */
+table.compare{width:100%;border-collapse:collapse;font-size:13px;}
+table.compare th,table.compare td{padding:9px 12px;border-bottom:1px solid var(--border-soft);text-align:left;}
+table.compare th{color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-family:var(--font-mono);font-weight:600;}
+
+/* Knowledge graph teaser dots */
+.dot-divider{display:flex;gap:5px;align-items:center;}
+.dot-divider span{width:4px;height:4px;border-radius:50%;background:var(--text-3);opacity:.5;}
+
+/* Settings */
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border-soft);}
+.settings-row:last-child{border-bottom:none;}
+.settings-row .sr-label{font-weight:600;font-size:13.5px;}
+.settings-row .sr-desc{font-size:12px;color:var(--text-3);margin-top:2px;max-width:420px;}
+.theme-swatch-row{display:flex;gap:10px;}
+.theme-swatch{width:64px;height:42px;border-radius:8px;border:2px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--font-mono);}
+.theme-swatch.active{border-color:var(--accent);}
+.switch{position:relative;width:38px;height:22px;background:var(--panel-3);border-radius:99px;border:1px solid var(--border);flex-shrink:0;}
+.switch::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:var(--text-3);top:2px;left:2px;transition:.15s;}
+.switch.on{background:color-mix(in srgb, var(--accent) 35%, var(--panel-3));}
+.switch.on::after{left:19px;background:var(--accent);}
+
+</style>
+</head>
+<body data-theme="dark" data-colorblind="false">
+
+<svg style="display:none">
+  <symbol id="ic-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="ic-problem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16.2" r="0.4" fill="currentColor"/></symbol>
+  <symbol id="ic-decision" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9 9-9 9-9-9z"/></symbol>
+  <symbol id="ic-risk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9 17H3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.4" fill="currentColor"/></symbol>
+  <symbol id="ic-solution" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-3.6 10.8c.4.3.6.8.6 1.2v.5h6v-.5c0-.4.2-.9.6-1.2A6 6 0 0012 3z"/></symbol>
+  <symbol id="ic-graph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="13" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6.7 7.2L10.7 11.7M17.3 7.2L13.3 11.7M10.7 14.5L7.4 17.7"/></symbol>
+  <symbol id="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="ic-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9a6 6 0 1112 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9z"/><path d="M9.5 17a2.5 2.5 0 005 0"/></symbol>
+  <symbol id="ic-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.6 7.6 0 000-2l2-1.5-2-3.4-2.4.7a7.7 7.7 0 00-1.7-1l-.4-2.5h-4l-.4 2.5a7.7 7.7 0 00-1.7 1l-2.4-.7-2 3.4L6.6 11a7.6 7.6 0 000 2l-2 1.5 2 3.4 2.4-.7c.5.4 1.1.8 1.7 1l.4 2.5h4l.4-2.5a7.7 7.7 0 001.7-1l2.4.7 2-3.4z"/></symbol>
+  <symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="ic-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3 6 6 .9-4.5 4.3L17.5 19 12 16l-5.5 3 1-5.8L3 8.9 9 8z"/></symbol>
+  <symbol id="ic-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3 6.5 7 1-5 4.9 1.2 7-6.2-3.4-6.2 3.4 1.2-7-5-4.9 7-1z"/></symbol>
+  <symbol id="ic-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8"/><path d="M10 13h4"/></symbol>
+  <symbol id="ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V5a1 1 0 011-1h10"/></symbol>
+  <symbol id="ic-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="ic-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></symbol>
+  <symbol id="ic-chev-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="ic-panel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></symbol>
+  <symbol id="ic-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 13l4 4L19 7"/></symbol>
+  <symbol id="ic-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="ic-export" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></symbol>
+  <symbol id="ic-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22c4-1 6-4 6-7.5 0-2-1-3.5-2-5 0 1.5-.7 2.5-1.5 3 .3-3-1-5.5-3.5-7.5-.5 2.5-1.7 4-3 5.5C6.6 12.3 6 13.7 6 15c0 3.5 2.5 6 6 7z"/></symbol>
+</svg>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#06241D" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="14" r="2"/><circle cx="7" cy="19" r="2"/><path d="M7.5 7.3L10.8 12.5M16.5 7.3L13.2 12.5M10.5 15.3L8 17.8"/></svg></div>
+      <div>
+        <div class="brand-name">ThinkOS</div>
+        <div class="brand-sub">Decision Intelligence</div>
+      </div>
+    </div>
+    <nav class="nav-scroll" id="nav-scroll"></nav>
+    <div class="sidebar-foot">
+      <button class="btn" style="width:100%;justify-content:center" id="new-problem-sidebar-btn"><svg><use href="#ic-plus"/></svg>New Problem</button>
+    </div>
+  </aside>
+
+  <header id="topbar">
+    <button class="icon-btn" id="sidebar-toggle" title="Toggle sidebar"><svg><use href="#ic-panel"/></svg></button>
+    <div id="search-trigger"><svg style="width:14px;height:14px"><use href="#ic-search"/></svg><span>Search ThinkOS…</span><kbd>Ctrl K</kbd></div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="notif-btn" title="Notifications" style="position:relative;"><svg><use href="#ic-bell"/></svg><span id="notif-dot" style="display:none;position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:var(--danger);"></span></button>
+      <button class="icon-btn" id="context-toggle" title="Toggle context panel"><svg><use href="#ic-panel"/></svg></button>
+    </div>
+  </header>
+
+  <div id="main-grid">
+    <main id="workspace" class="scroll"></main>
+    <aside id="context-panel" class="scroll hidden"></aside>
+  </div>
+
+  <footer id="statusbar">
+    <span id="status-left">ThinkOS · Local-only workspace</span>
+    <span id="status-right"></span>
+  </footer>
+</div>
+
+<div id="modal-root"></div>
+<div id="cmdk-overlay" class="hidden">
+  <div id="cmdk">
+    <input id="cmdk-input" placeholder="Search problems, decisions, risks… or type a command" autocomplete="off">
+    <div id="cmdk-results"></div>
+  </div>
+</div>
+<div id="toast-stack"></div>
+
+<script>
+/* =========================================================
+   THINKOS — DECISION INTELLIGENCE WORKSPACE
+   Single-file vanilla JS app. Organized into modules:
+   1. Constants & Utils
+   2. Data Layer (schema, persistence, seed)
+   3. Render Core (router, shell, shared components)
+   4. Module: Dashboard
+   5. Module: Problems (list, detail, decomposition, root cause, solutions)
+   6. Module: Decisions
+   7. Module: Risks
+   8. Module: Search / Command Palette
+   9. Module: Settings / Export-Import
+   10. Bootstrap
+   ========================================================= */
+
+/* ---------- 1. CONSTANTS & UTILS ---------- */
+const STORAGE_KEY = 'thinkos_db_v1';
+const CATEGORIES = ['Personal','Career','Business','Engineering','Education','Research','Finance','Health','Product','Operations','Strategy','Other'];
+const PRIORITIES = ['Low','Medium','High','Critical'];
+const STATUSES = ['Open','In Progress','Blocked','Resolved','Archived'];
+const ASSUMPTION_STATUSES = ['Unverified','Testing','Validated','Rejected','Needs Review'];
+const FISHBONE_CATS = ['People','Process','Equipment','Environment','Materials','Management'];
+const SIMPLE_SECTIONS = [
+  {key:'constraints', label:'Constraints', help:'Limits you must work within (budget, time, rules).'},
+  {key:'dependencies', label:'Dependencies', help:'Things this problem depends on.'},
+  {key:'unknowns', label:'Unknowns', help:'Things you don\u2019t yet know.'},
+  {key:'questions', label:'Open Questions', help:'Questions worth answering before deciding.'},
+  {key:'evidence', label:'Evidence', help:'Facts and data points you\u2019ve gathered.'},
+  {key:'observations', label:'Observations', help:'What you\u2019ve noticed so far.'},
+  {key:'hypotheses', label:'Hypotheses', help:'Theories about what\u2019s really going on.'}
+];
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function nowISO(){ return new Date().toISOString(); }
+function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+function fmtDateTime(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); }
+function timeAgo(iso){
+  const s = Math.floor((Date.now()-new Date(iso).getTime())/1000);
+  if(s<60) return 'just now';
+  if(s<3600) return Math.floor(s/60)+'m ago';
+  if(s<86400) return Math.floor(s/3600)+'h ago';
+  if(s<604800) return Math.floor(s/86400)+'d ago';
+  return fmtDate(iso);
+}
+function clamp(n,min,max){ return Math.max(min,Math.min(max,n)); }
+function escapeHtml(str){
+  if(str===undefined||str===null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+function downloadFile(filename, content, type){
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+function readFileAsText(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>resolve(r.result);
+    r.onerror = reject;
+    r.readAsText(file);
+  });
+}
+
+/* ---------- 2. DATA LAYER ---------- */
+function emptyDecomposition(){
+  return {
+    statement:'', desiredOutcome:'', currentState:'', futureState:'',
+    constraints:[], dependencies:[], unknowns:[], questions:[], evidence:[], observations:[], hypotheses:[],
+    assumptions:[]
+  };
+}
+function emptyRootCause(){
+  const fishbone = {};
+  FISHBONE_CATS.forEach(c=>fishbone[c]=[]);
+  return { whys:[{id:uid(),text:''}], fishbone, causes:[] };
+}
+function newProblem(overrides={}){
+  const now = nowISO();
+  return Object.assign({
+    id: uid(), title:'Untitled Problem', description:'', priority:'Medium', status:'Open',
+    category:'Other', difficulty:3, urgency:3, impact:3, owner:'Me', tags:[],
+    favorite:false, archived:false, pinned:false,
+    createdAt: now, updatedAt: now,
+    decomposition: emptyDecomposition(),
+    rootCause: emptyRootCause(),
+    solutions: []
+  }, overrides);
+}
+function newDecision(overrides={}){
+  const now = nowISO();
+  return Object.assign({
+    id: uid(), title:'Untitled Decision', problemId:null, solutionId:null,
+    reasoning:'', confidence:60, prediction:'', expectedOutcome:'', actualOutcome:'',
+    status:'Pending', lessons:'', reviewDate:'', createdAt:now, updatedAt:now
+  }, overrides);
+}
+function newRisk(overrides={}){
+  const now = nowISO();
+  return Object.assign({
+    id: uid(), title:'Untitled Risk', category:'Operational', problemId:null,
+    probability:3, impact:3, mitigation:'', owner:'Me', status:'Monitoring', createdAt:now, updatedAt:now
+  }, overrides);
+}
+function defaultDB(){
+  return {
+    problems: [], decisions: [], risks: [],
+    settings: { theme:'dark', colorblind:false, sidebarCollapsed:false },
+    meta: { createdAt: nowISO() }
+  };
+}
+let DB = null;
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ DB = defaultDB(); seedDemoData(); saveDB(); return; }
+    DB = JSON.parse(raw);
+    if(!DB.settings) DB.settings = { theme:'dark', colorblind:false, sidebarCollapsed:false };
+  }catch(e){
+    console.error('ThinkOS: failed to load DB, resetting', e);
+    DB = defaultDB(); seedDemoData();
+  }
+}
+const saveDBRaw = ()=>{
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+    updateStatusBar();
+  }catch(e){ console.error('ThinkOS: save failed', e); toast('Save failed — storage may be full', 'danger'); }
+};
+const saveDB = debounce(saveDBRaw, 150);
+
+function seedDemoData(){
+  const p1 = newProblem({
+    title:'Customer churn rising in SMB segment',
+    description:'SMB churn climbed from 4% to 7.2% monthly over the last quarter. Need to identify root causes and decide on an intervention before renewals dip further.',
+    priority:'Critical', status:'In Progress', category:'Business', difficulty:4, urgency:5, impact:5,
+    tags:['churn','smb','q3'], favorite:true, pinned:true
+  });
+  p1.decomposition.statement = 'SMB customers are cancelling at nearly double the historical rate, and we don\u2019t yet know which factor is dominant.';
+  p1.decomposition.desiredOutcome = 'Return SMB monthly churn to under 4.5% within two quarters.';
+  p1.decomposition.currentState = 'Churn at 7.2%, support tickets up 30%, no clear single cause identified yet.';
+  p1.decomposition.futureState = 'Predictable churn under 4.5%, early-warning signals in place for at-risk accounts.';
+  p1.decomposition.constraints = [{id:uid(),text:'No new headcount budget this quarter',createdAt:nowISO()}];
+  p1.decomposition.dependencies = [{id:uid(),text:'Support ticket data export from helpdesk tool',createdAt:nowISO()}];
+  p1.decomposition.assumptions = [
+    {id:uid(), text:'Pricing change in March is a major driver', confidence:55, evidence:'Churn inflection roughly aligns with pricing rollout', status:'Testing', validationDate:'', owner:'Me'},
+    {id:uid(), text:'Onboarding quality, not price, is the real driver', confidence:35, evidence:'Newer cohorts churn faster regardless of plan', status:'Unverified', validationDate:'', owner:'Me'}
+  ];
+  p1.rootCause.whys = [
+    {id:uid(), text:'Why are SMB customers cancelling more? Because they report not seeing value within 30 days.'},
+    {id:uid(), text:'Why don\u2019t they see value in 30 days? Because onboarding doesn\u2019t reach core feature adoption.'},
+    {id:uid(), text:'Why doesn\u2019t onboarding reach adoption? Because the guided setup flow was simplified last release.'},
+    {id:uid(), text:'Why was it simplified? To reduce signup friction for self-serve growth.'},
+    {id:uid(), text:'Why wasn\u2019t the tradeoff caught? No activation-rate guardrail existed on that release.'}
+  ];
+  p1.rootCause.causes = [
+    {id:uid(), text:'Weakened onboarding flow reduces feature activation', confidence:70, validated:false},
+    {id:uid(), text:'March pricing change pushed price-sensitive accounts out', confidence:45, validated:false}
+  ];
+  p1.solutions = [
+    { id:uid(), description:'Reinstate guided onboarding with activation checkpoints', cost:'Medium', risk:'Low', difficulty:3, expectedImpact:5, confidence:70, timeRequired:'3 weeks', resourcesRequired:'1 PM, 2 engineers', dependencies:'None', owner:'Growth team', createdAt:nowISO() },
+    { id:uid(), description:'Roll back March pricing change for SMB tier', cost:'High', risk:'Medium', difficulty:2, expectedImpact:3, confidence:40, timeRequired:'1 week', resourcesRequired:'Finance sign-off', owner:'RevOps', createdAt:nowISO() }
+  ];
+  const p2 = newProblem({
+    title:'Choosing a database for the new analytics service',
+    description:'Need to pick between Postgres, ClickHouse, and a managed warehouse for a new event-analytics feature.',
+    priority:'High', status:'Open', category:'Engineering', difficulty:3, urgency:3, impact:4, tags:['infra','analytics']
+  });
+  DB.problems.push(p1, p2);
+
+  const d1 = newDecision({
+    title:'Reinstate guided onboarding before addressing pricing',
+    problemId:p1.id, solutionId:p1.solutions[0].id,
+    reasoning:'Onboarding has stronger causal evidence and is reversible-cheap to test before touching pricing.',
+    confidence:68, prediction:'Churn should begin dropping within 4-6 weeks of relaunch.',
+    expectedOutcome:'Monthly SMB churn under 5.5% by next review.',
+    status:'Pending', reviewDate: new Date(Date.now()+1000*60*60*24*30).toISOString().slice(0,10)
+  });
+  DB.decisions.push(d1);
+
+  DB.risks.push(
+    newRisk({ title:'Onboarding fix doesn\u2019t move churn enough', category:'Strategic', problemId:p1.id, probability:3, impact:4, mitigation:'Set a 6-week checkpoint; pricing rollback as fallback.', status:'Monitoring' }),
+    newRisk({ title:'Pricing rollback erodes revenue per account', category:'Financial', problemId:p1.id, probability:2, impact:4, mitigation:'Model revenue impact before any rollback decision.', status:'Monitoring' }),
+    newRisk({ title:'Wrong database choice causes costly migration later', category:'Technical', problemId:p2.id, probability:2, impact:3, mitigation:'Timebox a 1-week spike comparing query patterns on real data.', status:'Open' })
+  );
+}
+
+/* ---------- 3. RENDER CORE ---------- */
+let UI = {
+  view: 'dashboard',
+  problemTab: 'overview',
+  selectedProblemId: null,
+  selectedDecisionId: null,
+  selectedRiskId: null,
+  problemViewMode: 'list',
+  filters: { status:'all', category:'all', priority:'all', q:'' },
+  contextOpen: false,
+  cmdkIndex: 0,
+};
+let _cbRegistry = {};
+function cb(fn){ const id = uid(); _cbRegistry[id] = fn; return id; }
+function runCb(id, ev){ if(ev) ev.stopPropagation(); if(_cbRegistry[id]) _cbRegistry[id](); }
+
+const NAV = [
+  { group:'Overview', items:[
+    {id:'dashboard', label:'Dashboard', icon:'ic-dashboard'},
+  ]},
+  { group:'Thinking', items:[
+    {id:'problems', label:'Problems', icon:'ic-problem', count:()=>DB.problems.filter(p=>!p.archived).length},
+    {id:'decisions', label:'Decisions', icon:'ic-decision', count:()=>DB.decisions.filter(d=>d.status==='Pending').length},
+    {id:'risks', label:'Risk Register', icon:'ic-risk', count:()=>DB.risks.filter(r=>r.status!=='Closed').length},
+  ]},
+  { group:'Insight', items:[
+    {id:'analytics', label:'Analytics', icon:'ic-graph'},
+  ]},
+  { group:'Coming next', items:[
+    {id:'roadmap:systems', label:'Systems Map', icon:'ic-graph', soon:true},
+    {id:'roadmap:knowledge', label:'Knowledge Graph', icon:'ic-graph', soon:true},
+    {id:'roadmap:scenario', label:'Scenario Simulator', icon:'ic-clock', soon:true},
+  ]},
+  { group:'System', items:[
+    {id:'settings', label:'Settings', icon:'ic-settings'},
+  ]},
+];
+
+function navigate(view, params={}){
+  UI.view = view;
+  Object.keys(params).forEach(k=>UI[k]=params[k]);
+  render();
+  document.getElementById('workspace').scrollTop = 0;
+}
+
+function renderNav(){
+  const el = document.getElementById('nav-scroll');
+  let html = '';
+  NAV.forEach(g=>{
+    html += `<div class="nav-group-label">${g.group}</div>`;
+    g.items.forEach(it=>{
+      const active = UI.view===it.id;
+      const count = it.count ? it.count() : null;
+      html += `<div class="nav-item ${active?'active':''}" style="${it.soon?'opacity:.5;cursor:default;':''}" ${it.soon?'':`onclick="navigate('${it.id}')"`} title="${it.soon?'Planned for the next build pass':''}">
+        <svg><use href="#${it.icon}"/></svg><span>${it.label}</span>
+        ${count!==null && count>0 ? `<span class="count">${count}</span>` : (it.soon?'<span class="count">soon</span>':'')}
+      </div>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+function updateStatusBar(){
+  const total = DB.problems.length + DB.decisions.length + DB.risks.length;
+  document.getElementById('status-right').textContent =
+    `${DB.problems.filter(p=>!p.archived).length} problems · ${DB.decisions.length} decisions · ${DB.risks.length} risks · saved ${timeAgo(nowISO())}`;
+}
+
+function applyTheme(){
+  document.body.setAttribute('data-theme', DB.settings.theme);
+  document.body.setAttribute('data-colorblind', DB.settings.colorblind ? 'true' : 'false');
+}
+
+/* Toasts */
+function toast(msg, kind='accent'){
+  const stack = document.getElementById('toast-stack');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `<span class="t-dot" style="background:var(--${kind==='accent'?'accent':kind})"></span><span>${escapeHtml(msg)}</span>`;
+  stack.appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .2s'; el.style.opacity='0'; setTimeout(()=>el.remove(),200); }, 3000);
+}
+
+/* Modals */
+function openModal(title, bodyHtml, footHtml, opts={}){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="modal-overlay" id="active-modal-overlay">
+    <div class="modal" style="${opts.wide?'width:760px':''}" onclick="event.stopPropagation()">
+      <div class="modal-head"><h3>${title}</h3><button class="icon-btn" onclick="closeModal()"><svg><use href="#ic-x"/></svg></button></div>
+      <div class="modal-body">${bodyHtml}</div>
+      ${footHtml?`<div class="modal-foot">${footHtml}</div>`:''}
+    </div>
+  </div>`;
+  document.getElementById('active-modal-overlay').addEventListener('click', closeModal);
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+function confirmDialog(message, onConfirm, opts={}){
+  const id = cb(()=>{ onConfirm(); closeModal(); });
+  openModal(opts.title||'Are you sure?', `<p style="color:var(--text-2);margin:0;">${escapeHtml(message)}</p>`,
+    `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn ${opts.danger?'btn-danger':'btn-primary'}" onclick="runCb('${id}')">${opts.confirmLabel||'Confirm'}</button>`);
+}
+
+/* Shared components */
+function ringSVG(percent, opts={}){
+  const size = opts.size||46, stroke=opts.stroke||5, color=opts.color||'var(--accent)';
+  const r = (size-stroke)/2, c = size/2, circ = 2*Math.PI*r;
+  const pct = clamp(percent,0,100);
+  const offset = circ * (1 - pct/100);
+  return `<span class="ring-wrap" style="width:${size}px;height:${size}px;">
+    <svg width="${size}" height="${size}">
+      <circle class="ring-track" cx="${c}" cy="${c}" r="${r}" stroke-width="${stroke}"></circle>
+      <circle class="ring-fill" cx="${c}" cy="${c}" r="${r}" stroke-width="${stroke}" style="stroke:${color};stroke-dasharray:${circ};stroke-dashoffset:${offset};"></circle>
+    </svg>
+    <span class="ring-label" style="font-size:${size*0.28}px;">${Math.round(pct)}</span>
+  </span>`;
+}
+function priorityBadge(p){
+  const map = {Low:'b-neutral', Medium:'b-info', High:'b-warn', Critical:'b-danger'};
+  return `<span class="badge ${map[p]||'b-neutral'}">${p}</span>`;
+}
+function statusBadge(s){
+  const map = {Open:'b-info','In Progress':'b-accent', Blocked:'b-danger', Resolved:'b-success', Archived:'b-neutral',
+    Pending:'b-warn', Confirmed:'b-success', Reviewed:'b-success',
+    Monitoring:'b-info', Mitigated:'b-success', Closed:'b-neutral',
+    Unverified:'b-neutral', Testing:'b-info', Validated:'b-success', Rejected:'b-danger', 'Needs Review':'b-warn'};
+  return `<span class="badge ${map[s]||'b-neutral'}">${s}</span>`;
+}
+function emptyState(icon, title, desc, actionHtml=''){
+  return `<div class="empty-state"><svg class="es-icon"><use href="#${icon}"/></svg><h3>${title}</h3><p>${desc}</p>${actionHtml}</div>`;
+}
+function riskScoreColor(score){
+  if(score>=15) return 'var(--danger)';
+  if(score>=8) return 'var(--warn)';
+  return 'var(--success)';
+}
+
+/* Generic repeatable text-list editor used across decomposition sections */
+function repeatListHtml(problemId, sectionKey, items, label, help){
+  const rows = items.map(it=>`
+    <div class="repeat-item">
+      <div class="ri-text">${escapeHtml(it.text)}</div>
+      <button class="ri-del" onclick="removeListItem('${problemId}','${sectionKey}','${it.id}')" title="Remove">×</button>
+    </div>`).join('');
+  return `
+    <div class="field">
+      <label>${label}</label>
+      <div class="hint" style="margin-top:-2px;margin-bottom:6px;">${help}</div>
+      <div class="repeat-list">${rows || '<div class="hint">Nothing added yet.</div>'}</div>
+      <div class="repeat-add">
+        <input type="text" id="add-${sectionKey}-${problemId}" placeholder="Add ${label.toLowerCase()}…" onkeydown="if(event.key==='Enter') addListItem('${problemId}','${sectionKey}')">
+        <button class="btn sm" onclick="addListItem('${problemId}','${sectionKey}')">Add</button>
+      </div>
+    </div>`;
+}
+function addListItem(problemId, sectionKey){
+  const input = document.getElementById(`add-${sectionKey}-${problemId}`);
+  const val = input.value.trim();
+  if(!val) return;
+  const p = DB.problems.find(p=>p.id===problemId);
+  p.decomposition[sectionKey].push({id:uid(), text:val, createdAt:nowISO()});
+  p.updatedAt = nowISO();
+  saveDB(); renderProblemDetail();
+}
+function removeListItem(problemId, sectionKey, itemId){
+  const p = DB.problems.find(p=>p.id===problemId);
+  p.decomposition[sectionKey] = p.decomposition[sectionKey].filter(i=>i.id!==itemId);
+  p.updatedAt = nowISO();
+  saveDB(); renderProblemDetail();
+}
+
+/* ---------- ROUTER / RENDER DISPATCH ---------- */
+function render(){
+  renderNav();
+  updateStatusBar();
+  const ws = document.getElementById('workspace');
+  switch(UI.view){
+    case 'dashboard': ws.innerHTML = renderDashboard(); break;
+    case 'problems': ws.innerHTML = renderProblemsList(); break;
+    case 'problem-detail': ws.innerHTML = renderProblemDetail(true); break;
+    case 'decisions': ws.innerHTML = renderDecisionsList(); break;
+    case 'decision-detail': ws.innerHTML = renderDecisionDetail(true); break;
+    case 'risks': ws.innerHTML = renderRisksList(); break;
+    case 'analytics': ws.innerHTML = renderAnalytics(); break;
+    case 'settings': ws.innerHTML = renderSettings(); break;
+    default: ws.innerHTML = renderDashboard();
+  }
+}
+
+/* ---------- WORKSPACE-WIDE COMPUTED STATS ---------- */
+function problemThinkingQuality(p){
+  const d = p.decomposition, rc = p.rootCause;
+  const hasStatement = d.statement.trim() ? 1 : 0;
+  const assumptionsCov = clamp(d.assumptions.length/2,0,1);
+  const evidenceCov = clamp(d.evidence.length/2,0,1);
+  const whysFilled = rc.whys.filter(w=>w.text.trim()).length;
+  const rootCauseCov = clamp((whysFilled/5)*0.6 + (rc.causes.length>0?0.4:0),0,1);
+  const solutionsCov = clamp(p.solutions.length/2,0,1);
+  const riskCov = DB.risks.some(r=>r.problemId===p.id) ? 1 : 0;
+  const avg = (hasStatement+assumptionsCov+evidenceCov+rootCauseCov+solutionsCov+riskCov)/6;
+  return Math.round(avg*100);
+}
+function computeWorkspaceStats(){
+  const active = DB.problems.filter(p=>!p.archived);
+  const tqScores = active.map(problemThinkingQuality);
+  const tq = tqScores.length ? Math.round(tqScores.reduce((a,b)=>a+b,0)/tqScores.length) : 0;
+  const reviewed = DB.decisions.filter(d=>d.accuracyRating!=null);
+  const accuracy = reviewed.length ? Math.round(reviewed.reduce((a,d)=>a+d.accuracyRating,0)/reviewed.length) : null;
+  const riskScored = DB.risks.map(r=>({...r, score:r.probability*r.impact}));
+  const weekAgo = Date.now()-7*86400000, monthAgo = Date.now()-30*86400000;
+  const createdSince = (t)=> DB.problems.filter(p=>new Date(p.createdAt).getTime()>t).length
+    + DB.decisions.filter(d=>new Date(d.createdAt).getTime()>t).length
+    + DB.risks.filter(r=>new Date(r.createdAt).getTime()>t).length;
+  return {
+    activeCount: active.length,
+    pendingDecisions: DB.decisions.filter(d=>d.status==='Pending').length,
+    openRisks: DB.risks.filter(r=>r.status!=='Closed').length,
+    highRisks: riskScored.filter(r=>r.score>=15).length,
+    thinkingQuality: tq,
+    tqScores,
+    decisionAccuracy: accuracy,
+    weekActivity: createdSince(weekAgo),
+    monthActivity: createdSince(monthAgo),
+    riskScored
+  };
+}
+
+/* ---------- 4. DASHBOARD MODULE ---------- */
+function renderDashboard(){
+  const s = computeWorkspaceStats();
+  const recent = [...DB.problems].filter(p=>!p.archived).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt)).slice(0,5);
+  const pinned = DB.problems.filter(p=>p.pinned && !p.archived);
+  const activeDecisions = DB.decisions.filter(d=>d.status==='Pending').sort((a,b)=>new Date(a.reviewDate||'9999')-new Date(b.reviewDate||'9999')).slice(0,5);
+  const topRisks = [...s.riskScored].filter(r=>r.status!=='Closed').sort((a,b)=>b.score-a.score).slice(0,4);
+
+  const validatedAssumptions = DB.problems.flatMap(p=>p.decomposition.assumptions).filter(a=>a.status==='Validated').length;
+  const totalAssumptions = DB.problems.flatMap(p=>p.decomposition.assumptions).length;
+  const staleAssumptions = DB.problems.flatMap(p=>p.decomposition.assumptions).filter(a=>a.status==='Unverified').length;
+
+  return `
+    <div class="eyebrow">${new Date().toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'})}</div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-sub">A clear view of what you're solving, deciding, and watching right now.</p>
+
+    <div class="grid grid-cards" style="margin-bottom:6px;">
+      <button class="btn btn-primary" style="justify-content:center;padding:11px;" onclick="openProblemModal()"><svg><use href="#ic-plus"/></svg>New Problem</button>
+      <button class="btn" style="justify-content:center;padding:11px;" onclick="openDecisionModal()"><svg><use href="#ic-decision"/></svg>New Decision</button>
+      <button class="btn" style="justify-content:center;padding:11px;" onclick="openRiskModal()"><svg><use href="#ic-risk"/></svg>New Risk</button>
+      <button class="btn" style="justify-content:center;padding:11px;" onclick="openCmdk()"><svg><use href="#ic-search"/></svg>Command Palette</button>
+    </div>
+
+    <div class="section-divider"><span class="dot"></span>Workspace pulse</div>
+    <div class="grid grid-stats">
+      <div class="stat-card"><div class="stat-label">Active Problems</div><div class="stat-value">${s.activeCount}</div><div class="stat-delta">${DB.problems.filter(p=>p.archived).length} archived</div></div>
+      <div class="stat-card"><div class="stat-label">Pending Decisions</div><div class="stat-value">${s.pendingDecisions}</div><div class="stat-delta">${DB.decisions.length} total logged</div></div>
+      <div class="stat-card"><div class="stat-label">Open Risks</div><div class="stat-value">${s.openRisks}</div><div class="stat-delta ${s.highRisks?'down':''}">${s.highRisks} scored high (≥15)</div></div>
+      <div class="stat-card"><div class="stat-label">Thinking Quality</div><div class="stat-value">${s.thinkingQuality}<span style="font-size:14px;color:var(--text-3);">/100</span></div><div class="stat-delta">avg across active problems</div></div>
+      <div class="stat-card"><div class="stat-label">Decision Accuracy</div><div class="stat-value">${s.decisionAccuracy!=null? s.decisionAccuracy+'<span style="font-size:14px;color:var(--text-3);">/100</span>' : '—'}</div><div class="stat-delta">from reviewed decisions</div></div>
+      <div class="stat-card"><div class="stat-label">This Week</div><div class="stat-value">${s.weekActivity}</div><div class="stat-delta">items created</div></div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:26px;align-items:start;">
+      <div>
+        <div class="section-divider"><span class="dot"></span>Recent problems</div>
+        <div class="card divide" style="padding:4px;">
+          ${recent.length? recent.map(p=>dashboardProblemRow(p)).join('') : `<div style="padding:14px;color:var(--text-3);font-size:13px;">No problems yet. Create your first one above.</div>`}
+        </div>
+
+        ${pinned.length? `<div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Pinned</div>
+        <div class="card divide" style="padding:4px;">${pinned.map(p=>dashboardProblemRow(p)).join('')}</div>` : ''}
+      </div>
+
+      <div>
+        <div class="section-divider"><span class="dot"></span>Active decisions</div>
+        <div class="card divide" style="padding:4px;">
+          ${activeDecisions.length? activeDecisions.map(d=>`
+            <div class="list-item clickable" onclick="navigate('decision-detail',{selectedDecisionId:'${d.id}'})">
+              <div style="flex:1;min-width:0;">
+                <div class="li-title">${escapeHtml(d.title)}</div>
+                <div class="li-meta">Review by ${d.reviewDate?fmtDate(d.reviewDate):'no date set'} · confidence ${d.confidence}%</div>
+              </div>
+              ${statusBadge(d.status)}
+            </div>`).join('') : `<div style="padding:14px;color:var(--text-3);font-size:13px;">No pending decisions.</div>`}
+        </div>
+
+        <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Risk alerts</div>
+        <div class="card divide" style="padding:4px;">
+          ${topRisks.length? topRisks.map(r=>`
+            <div class="list-item clickable" onclick="navigate('risks')">
+              <div style="flex:1;min-width:0;">
+                <div class="li-title">${escapeHtml(r.title)}</div>
+                <div class="li-meta">${r.category} · prob ${r.probability} × impact ${r.impact}</div>
+              </div>
+              <span class="badge" style="background:color-mix(in srgb, ${riskScoreColor(r.score)} 18%, transparent);color:${riskScoreColor(r.score)};">score ${r.score}</span>
+            </div>`).join('') : `<div style="padding:14px;color:var(--text-3);font-size:13px;">No active risks logged.</div>`}
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Knowledge insights</div>
+    <div class="grid grid-cards">
+      <div class="card"><div class="stat-label" style="margin-bottom:6px;">Assumption health</div><div style="font-size:13px;color:var(--text-2);">${totalAssumptions} assumptions tracked, <b style="color:var(--text-1);">${validatedAssumptions} validated</b>, ${staleAssumptions} still unverified.</div></div>
+      <div class="card"><div class="stat-label" style="margin-bottom:6px;">Root cause depth</div><div style="font-size:13px;color:var(--text-2);">${DB.problems.filter(p=>p.rootCause.causes.length>0).length} of ${s.activeCount} active problems have at least one ranked root cause.</div></div>
+      <div class="card"><div class="stat-label" style="margin-bottom:6px;">Solution coverage</div><div style="font-size:13px;color:var(--text-2);">${DB.problems.filter(p=>p.solutions.length>0).length} of ${s.activeCount} active problems have a candidate solution logged.</div></div>
+    </div>
+  `;
+}
+function dashboardProblemRow(p){
+  return `<div class="list-item clickable" onclick="navigate('problem-detail',{selectedProblemId:'${p.id}', problemTab:'overview'})">
+    <div style="flex:1;min-width:0;">
+      <div class="li-title">${p.favorite?'★ ':''}${escapeHtml(p.title)}</div>
+      <div class="li-meta">${p.category} · updated ${timeAgo(p.updatedAt)}</div>
+    </div>
+    ${priorityBadge(p.priority)}
+  </div>`;
+}
+
+/* ---------- 5. PROBLEMS MODULE ---------- */
+function filteredProblems(){
+  const f = UI.filters;
+  return DB.problems.filter(p=>{
+    if(!f.showArchived && p.archived) return false;
+    if(f.status!=='all' && p.status!==f.status) return false;
+    if(f.category!=='all' && p.category!==f.category) return false;
+    if(f.priority!=='all' && p.priority!==f.priority) return false;
+    if(f.q){
+      const q = f.q.toLowerCase();
+      if(!(p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || p.tags.some(t=>t.toLowerCase().includes(q)))) return false;
+    }
+    return true;
+  }).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+}
+function setFilter(key,val){ UI.filters[key]=val; render(); }
+function setProblemViewMode(mode){ UI.problemViewMode = mode; render(); }
+
+function renderProblemsList(){
+  const list = filteredProblems();
+  const f = UI.filters;
+  return `
+    <h1 class="page-title">Problems</h1>
+    <p class="page-sub">Capture, categorize, and work every problem through to a decision.</p>
+    <div class="filter-bar">
+      <input type="text" placeholder="Search problems…" value="${escapeHtml(f.q)}" oninput="setFilter('q', this.value)" style="min-width:200px;">
+      <select onchange="setFilter('status', this.value)">
+        <option value="all" ${f.status==='all'?'selected':''}>All statuses</option>
+        ${STATUSES.map(s=>`<option value="${s}" ${f.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <select onchange="setFilter('category', this.value)">
+        <option value="all" ${f.category==='all'?'selected':''}>All categories</option>
+        ${CATEGORIES.map(c=>`<option value="${c}" ${f.category===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      <select onchange="setFilter('priority', this.value)">
+        <option value="all" ${f.priority==='all'?'selected':''}>All priorities</option>
+        ${PRIORITIES.map(p=>`<option value="${p}" ${f.priority===p?'selected':''}>${p}</option>`).join('')}
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-2);"><input type="checkbox" ${f.showArchived?'checked':''} onchange="setFilter('showArchived', this.checked)" style="width:auto;">Show archived</label>
+      <div style="flex:1;"></div>
+      <div class="seg">
+        <button class="${UI.problemViewMode==='list'?'active':''}" onclick="setProblemViewMode('list')">List</button>
+        <button class="${UI.problemViewMode==='grid'?'active':''}" onclick="setProblemViewMode('grid')">Grid</button>
+      </div>
+      <button class="btn btn-primary" onclick="openProblemModal()"><svg><use href="#ic-plus"/></svg>New Problem</button>
+    </div>
+    ${list.length===0 ? emptyState('ic-problem','No problems match','Try adjusting your filters, or capture a new problem to start working it through the pipeline.', `<button class="btn btn-primary" onclick="openProblemModal()">New Problem</button>`)
+      : UI.problemViewMode==='grid' ? `<div class="grid grid-cards">${list.map(p=>problemCard(p)).join('')}</div>`
+      : `<div class="card divide" style="padding:4px;">${list.map(p=>problemListRow(p)).join('')}</div>`}
+  `;
+}
+function problemCard(p){
+  const tq = problemThinkingQuality(p);
+  return `<div class="card hoverable clickable" onclick="navigate('problem-detail',{selectedProblemId:'${p.id}', problemTab:'overview'})">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="font-weight:600;font-size:14.5px;line-height:1.3;">${p.favorite?'★ ':''}${escapeHtml(p.title)}</div>
+      ${ringSVG(tq,{size:36,stroke:4})}
+    </div>
+    <div style="display:flex;gap:6px;margin:10px 0;flex-wrap:wrap;">${priorityBadge(p.priority)}${statusBadge(p.status)}<span class="badge b-neutral">${p.category}</span></div>
+    <div style="font-size:12.5px;color:var(--text-3);">Updated ${timeAgo(p.updatedAt)}</div>
+  </div>`;
+}
+function problemListRow(p){
+  const tq = problemThinkingQuality(p);
+  return `<div class="list-item clickable" onclick="navigate('problem-detail',{selectedProblemId:'${p.id}', problemTab:'overview'})">
+    ${ringSVG(tq,{size:30,stroke:3})}
+    <div style="flex:1;min-width:0;">
+      <div class="li-title">${p.favorite?'★ ':''}${escapeHtml(p.title)}</div>
+      <div class="li-meta">${p.category} · updated ${timeAgo(p.updatedAt)}</div>
+    </div>
+    <div class="tag-row">${p.tags.slice(0,3).map(t=>`<span class="tag-pill">${escapeHtml(t)}</span>`).join('')}</div>
+    ${priorityBadge(p.priority)}${statusBadge(p.status)}
+    <button class="icon-btn" onclick="runCb('${cb(()=>toggleFavorite(p.id))}', event)" title="Favorite"><svg style="color:${p.favorite?'var(--warn)':'inherit'}"><use href="#ic-star"/></svg></button>
+  </div>`;
+}
+function toggleFavorite(id){ const p=DB.problems.find(p=>p.id===id); p.favorite=!p.favorite; p.updatedAt=nowISO(); saveDB(); render(); }
+function togglePin(id){ const p=DB.problems.find(p=>p.id===id); p.pinned=!p.pinned; p.updatedAt=nowISO(); saveDB(); render(); }
+function toggleArchive(id){
+  const p=DB.problems.find(p=>p.id===id);
+  p.archived=!p.archived; p.status = p.archived ? 'Archived' : 'Open'; p.updatedAt=nowISO();
+  saveDB(); toast(p.archived?'Problem archived':'Problem restored','accent'); navigate('problems');
+}
+function duplicateProblem(id){
+  const p=DB.problems.find(p=>p.id===id);
+  const copy = JSON.parse(JSON.stringify(p));
+  copy.id = uid(); copy.title = p.title+' (copy)'; copy.createdAt=nowISO(); copy.updatedAt=nowISO(); copy.favorite=false; copy.pinned=false;
+  DB.problems.push(copy); saveDB(); toast('Problem duplicated'); navigate('problem-detail',{selectedProblemId:copy.id, problemTab:'overview'});
+}
+function deleteProblem(id){
+  confirmDialog('This permanently deletes the problem and everything attached to it (decomposition, root cause, solutions). This cannot be undone.', ()=>{
+    DB.problems = DB.problems.filter(p=>p.id!==id);
+    DB.decisions.forEach(d=>{ if(d.problemId===id) d.problemId=null; });
+    DB.risks.forEach(r=>{ if(r.problemId===id) r.problemId=null; });
+    saveDB(); toast('Problem deleted','danger'); navigate('problems');
+  }, {title:'Delete problem?', confirmLabel:'Delete', danger:true});
+}
+
+/* Create / Edit modal */
+function openProblemModal(id=null){
+  const p = id ? DB.problems.find(p=>p.id===id) : null;
+  const body = `
+    <div class="field"><label>Title</label><input id="pf-title" type="text" value="${p?escapeHtml(p.title):''}" placeholder="What's the problem, in one line?"></div>
+    <div class="field"><label>Description</label><textarea id="pf-desc" placeholder="A bit more context...">${p?escapeHtml(p.description):''}</textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Category</label><select id="pf-cat">${CATEGORIES.map(c=>`<option ${p&&p.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Priority</label><select id="pf-pri">${PRIORITIES.map(c=>`<option ${(p?p.priority:'Medium')===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select id="pf-status">${STATUSES.filter(s=>s!=='Archived').map(c=>`<option ${(p?p.status:'Open')===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Difficulty (1–5)</label><input id="pf-diff" type="range" min="1" max="5" value="${p?p.difficulty:3}"></div>
+      <div class="field"><label>Urgency (1–5)</label><input id="pf-urg" type="range" min="1" max="5" value="${p?p.urgency:3}"></div>
+      <div class="field"><label>Impact (1–5)</label><input id="pf-imp" type="range" min="1" max="5" value="${p?p.impact:3}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Owner</label><input id="pf-owner" type="text" value="${p?escapeHtml(p.owner):'Me'}"></div>
+      <div class="field"><label>Tags (comma separated)</label><input id="pf-tags" type="text" value="${p?escapeHtml(p.tags.join(', ')):''}" placeholder="growth, urgent"></div>
+    </div>
+  `;
+  const foot = `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitProblemForm(${p?`'${p.id}'`:'null'})">${p?'Save changes':'Create problem'}</button>`;
+  openModal(p?'Edit Problem':'New Problem', body, foot, {wide:true});
+  setTimeout(()=>document.getElementById('pf-title').focus(),30);
+}
+function submitProblemForm(id){
+  const title = document.getElementById('pf-title').value.trim();
+  if(!title){ toast('Give the problem a title first','warn'); return; }
+  const vals = {
+    title,
+    description: document.getElementById('pf-desc').value.trim(),
+    category: document.getElementById('pf-cat').value,
+    priority: document.getElementById('pf-pri').value,
+    status: document.getElementById('pf-status').value,
+    difficulty: +document.getElementById('pf-diff').value,
+    urgency: +document.getElementById('pf-urg').value,
+    impact: +document.getElementById('pf-imp').value,
+    owner: document.getElementById('pf-owner').value.trim() || 'Me',
+    tags: document.getElementById('pf-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+  };
+  if(id){
+    const p = DB.problems.find(p=>p.id===id);
+    Object.assign(p, vals); p.updatedAt = nowISO();
+    toast('Problem updated');
+  } else {
+    const p = newProblem(vals);
+    DB.problems.push(p);
+    toast('Problem created');
+    saveDB(); closeModal(); navigate('problem-detail',{selectedProblemId:p.id, problemTab:'overview'});
+    return;
+  }
+  saveDB(); closeModal(); render();
+}
+
+/* ---------- PROBLEM DETAIL ---------- */
+function setProblemTab(tab){ UI.problemTab = tab; render(); }
+function currentProblem(){ return DB.problems.find(p=>p.id===UI.selectedProblemId); }
+function autosaveField(problemId, path, value){
+  const p = DB.problems.find(p=>p.id===problemId);
+  const parts = path.split('.');
+  let obj = p; for(let i=0;i<parts.length-1;i++) obj = obj[parts[i]];
+  obj[parts[parts.length-1]] = value;
+  p.updatedAt = nowISO(); saveDB();
+}
+function renderProblemDetail(){
+  const p = currentProblem();
+  if(!p){ navigate('problems'); return ''; }
+  const tq = problemThinkingQuality(p);
+  const tabs = [['overview','Overview'],['decomposition','Decomposition'],['rootcause','Root Cause'],['solutions','Solutions'],['linked','Decisions & Risk']];
+  const html = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:6px;">
+      <div style="min-width:0;">
+        <button class="btn sm" style="margin-bottom:10px;" onclick="navigate('problems')"><svg><use href="#ic-chev-left"/></svg>All problems</button>
+        <h1 class="page-title" style="word-break:break-word;">${escapeHtml(p.title)}</h1>
+        <div class="tag-row" style="margin-top:8px;">${priorityBadge(p.priority)}${statusBadge(p.status)}<span class="badge b-neutral">${p.category}</span>${p.tags.map(t=>`<span class="tag-pill">${escapeHtml(t)}</span>`).join('')}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+        ${ringSVG(tq,{size:52,stroke:5})}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin:14px 0 4px;">
+      <button class="icon-btn" title="Favorite" onclick="toggleFavorite('${p.id}')"><svg style="color:${p.favorite?'var(--warn)':'inherit'}"><use href="#ic-star"/></svg></button>
+      <button class="icon-btn" title="Pin to dashboard" onclick="togglePin('${p.id}')"><svg style="color:${p.pinned?'var(--accent)':'inherit'}"><use href="#ic-pin"/></svg></button>
+      <button class="icon-btn" title="Edit basics" onclick="openProblemModal('${p.id}')"><svg><use href="#ic-edit"/></svg></button>
+      <button class="icon-btn" title="Duplicate" onclick="duplicateProblem('${p.id}')"><svg><use href="#ic-copy"/></svg></button>
+      <button class="icon-btn" title="${p.archived?'Restore':'Archive'}" onclick="toggleArchive('${p.id}')"><svg><use href="#ic-archive"/></svg></button>
+      <button class="icon-btn btn-danger" title="Delete" onclick="deleteProblem('${p.id}')"><svg><use href="#ic-trash"/></svg></button>
+    </div>
+    <div class="tabs" style="margin-top:18px;">
+      ${tabs.map(([k,label])=>`<div class="tab ${UI.problemTab===k?'active':''}" onclick="setProblemTab('${k}')">${label}</div>`).join('')}
+    </div>
+    <div id="problem-tab-content">
+      ${UI.problemTab==='overview'?tabOverview(p): UI.problemTab==='decomposition'?tabDecomposition(p): UI.problemTab==='rootcause'?tabRootCause(p): UI.problemTab==='solutions'?tabSolutions(p): tabLinked(p)}
+    </div>
+  `;
+  const ws = document.getElementById('workspace');
+  if(ws) ws.innerHTML = html;
+  return html;
+}
+function tabOverview(p){
+  return `
+    <div class="field"><label>Description</label><textarea onblur="autosaveField('${p.id}','description', this.value)" style="min-height:90px;">${escapeHtml(p.description)}</textarea></div>
+    <div class="grid grid-2">
+      <div class="field"><label>Owner</label><input type="text" value="${escapeHtml(p.owner)}" onblur="autosaveField('${p.id}','owner', this.value)"></div>
+      <div class="field"><label>Created</label><input type="text" value="${fmtDateTime(p.createdAt)}" disabled></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Difficulty</label><input type="range" min="1" max="5" value="${p.difficulty}" onchange="autosaveField('${p.id}','difficulty', +this.value)"></div>
+      <div class="field"><label>Urgency</label><input type="range" min="1" max="5" value="${p.urgency}" onchange="autosaveField('${p.id}','urgency', +this.value)"></div>
+      <div class="field"><label>Impact</label><input type="range" min="1" max="5" value="${p.impact}" onchange="autosaveField('${p.id}','impact', +this.value)"></div>
+    </div>
+    <div class="section-divider"><span class="dot"></span>Thinking quality breakdown</div>
+    <p style="color:var(--text-2);font-size:13px;max-width:600px;">Score reflects whether a clear statement, assumptions, evidence, a root cause, a candidate solution, and a linked risk exist for this problem. Fill in the other tabs to raise it.</p>
+  `;
+}
+function tabDecomposition(p){
+  const d = p.decomposition;
+  return `
+    <div class="grid grid-2">
+      <div class="field"><label>Problem Statement</label><textarea onblur="autosaveField('${p.id}','decomposition.statement', this.value)" placeholder="State the problem precisely.">${escapeHtml(d.statement)}</textarea></div>
+      <div class="field"><label>Desired Outcome</label><textarea onblur="autosaveField('${p.id}','decomposition.desiredOutcome', this.value)" placeholder="What does success look like?">${escapeHtml(d.desiredOutcome)}</textarea></div>
+      <div class="field"><label>Current State</label><textarea onblur="autosaveField('${p.id}','decomposition.currentState', this.value)" placeholder="Where things stand today.">${escapeHtml(d.currentState)}</textarea></div>
+      <div class="field"><label>Future State</label><textarea onblur="autosaveField('${p.id}','decomposition.futureState', this.value)" placeholder="Where things should end up.">${escapeHtml(d.futureState)}</textarea></div>
+    </div>
+    <div class="section-divider"><span class="dot"></span>Assumption Tracker</div>
+    ${assumptionsHtml(p)}
+    <div class="section-divider"><span class="dot"></span>Structured notes</div>
+    <div class="grid grid-2">
+      ${SIMPLE_SECTIONS.map(s=>repeatListHtml(p.id, s.key, d[s.key], s.label, s.help)).join('')}
+    </div>
+  `;
+}
+function assumptionsHtml(p){
+  const rows = p.decomposition.assumptions.map(a=>`
+    <div class="repeat-item" style="align-items:center;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;">${escapeHtml(a.text)}</div>
+        <div class="li-meta">Evidence: ${escapeHtml(a.evidence)||'—'} ${a.owner?' · Owner: '+escapeHtml(a.owner):''}</div>
+      </div>
+      <span class="badge b-neutral" style="font-family:var(--font-mono);">${a.confidence}%</span>
+      <select onchange="updateAssumption('${p.id}','${a.id}','status', this.value)" style="padding:4px 6px;font-size:11.5px;">
+        ${ASSUMPTION_STATUSES.map(s=>`<option ${a.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <button class="ri-del" onclick="removeAssumption('${p.id}','${a.id}')">×</button>
+    </div>`).join('');
+  return `
+    <div class="field">
+      <div class="repeat-list">${rows || '<div class="hint">No assumptions tracked yet — every decision rests on a few. Add one below.</div>'}</div>
+      <div class="card" style="margin-top:10px;padding:12px;background:var(--panel-2);">
+        <div class="grid grid-2">
+          <div class="field" style="margin-bottom:8px;"><label>Assumption</label><input id="asm-text-${p.id}" type="text" placeholder="What are we assuming is true?"></div>
+          <div class="field" style="margin-bottom:8px;"><label>Supporting evidence</label><input id="asm-evidence-${p.id}" type="text" placeholder="Why do we believe this?"></div>
+        </div>
+        <div class="field-row">
+          <div class="field" style="margin-bottom:0;"><label>Confidence ${'%'}</label><input id="asm-conf-${p.id}" type="range" min="0" max="100" value="50"></div>
+          <div class="field" style="margin-bottom:0;"><label>Owner</label><input id="asm-owner-${p.id}" type="text" value="Me" style="padding:7px 9px;"></div>
+        </div>
+        <button class="btn sm btn-primary" style="margin-top:10px;" onclick="addAssumption('${p.id}')">Add Assumption</button>
+      </div>
+    </div>`;
+}
+function addAssumption(problemId){
+  const text = document.getElementById(`asm-text-${problemId}`).value.trim();
+  if(!text){ toast('Add the assumption text first','warn'); return; }
+  const p = DB.problems.find(p=>p.id===problemId);
+  p.decomposition.assumptions.push({
+    id: uid(), text,
+    evidence: document.getElementById(`asm-evidence-${problemId}`).value.trim(),
+    confidence: +document.getElementById(`asm-conf-${problemId}`).value,
+    owner: document.getElementById(`asm-owner-${problemId}`).value.trim()||'Me',
+    status:'Unverified', validationDate:''
+  });
+  p.updatedAt = nowISO(); saveDB(); render();
+}
+function removeAssumption(problemId, id){
+  const p = DB.problems.find(p=>p.id===problemId);
+  p.decomposition.assumptions = p.decomposition.assumptions.filter(a=>a.id!==id);
+  p.updatedAt = nowISO(); saveDB(); render();
+}
+function updateAssumption(problemId, id, field, value){
+  const p = DB.problems.find(p=>p.id===problemId);
+  const a = p.decomposition.assumptions.find(a=>a.id===id);
+  a[field] = value; if(field==='status' && value==='Validated') a.validationDate = nowISO();
+  p.updatedAt = nowISO(); saveDB(); render();
+}
+
+/* ---------- ROOT CAUSE TAB (5 Whys + Fishbone + Ranking) ---------- */
+function tabRootCause(p){
+  const rc = p.rootCause;
+  return `
+    <div class="section-divider"><span class="dot"></span>5 Whys</div>
+    <p style="color:var(--text-2);font-size:13px;max-width:600px;margin-top:-8px;">Keep asking "why" until you hit something you can actually act on.</p>
+    <div class="whys-chain">
+      ${rc.whys.map((w,i)=>`
+        <div class="why-step">
+          <div class="why-rail"><div class="why-num">${i+1}</div>${i<rc.whys.length-1?'<div class="why-line"></div>':''}</div>
+          <div class="why-body">
+            <textarea placeholder="Why #${i+1}…" onblur="updateWhy('${p.id}','${w.id}', this.value)">${escapeHtml(w.text)}</textarea>
+            ${rc.whys.length>1?`<button class="btn sm" style="margin-top:6px;" onclick="removeWhy('${p.id}','${w.id}')">Remove</button>`:''}
+          </div>
+        </div>`).join('')}
+    </div>
+    <button class="btn sm" onclick="addWhy('${p.id}')"><svg><use href="#ic-plus"/></svg>Add another why</button>
+
+    <div class="section-divider" style="margin-top:30px;"><span class="dot"></span>Fishbone Diagram</div>
+    <div class="fishbone-wrap"><div class="fishbone-cats">
+      ${FISHBONE_CATS.map(cat=>`
+        <div class="fishbone-cat">
+          <h4>${cat}</h4>
+          <div class="repeat-list">
+            ${rc.fishbone[cat].map(it=>`<div class="repeat-item" style="padding:6px 8px;font-size:12px;"><div class="ri-text">${escapeHtml(it.text)}</div><button class="ri-del" onclick="removeFishbone('${p.id}','${cat}','${it.id}')">×</button></div>`).join('') || '<div class="hint" style="font-size:11.5px;">None yet</div>'}
+          </div>
+          <div class="repeat-add">
+            <input type="text" id="fb-${cat}-${p.id}" placeholder="Add cause…" style="font-size:12px;padding:5px 7px;" onkeydown="if(event.key==='Enter') addFishbone('${p.id}','${cat}')">
+          </div>
+        </div>`).join('')}
+    </div></div>
+
+    <div class="section-divider" style="margin-top:30px;"><span class="dot"></span>Root Cause Ranking</div>
+    <p style="color:var(--text-2);font-size:13px;max-width:600px;margin-top:-8px;">Rank candidate causes by how confident you are they're the real driver, and mark them validated once you have evidence.</p>
+    <div class="card divide" style="padding:4px;">
+      ${[...rc.causes].sort((a,b)=>b.confidence-a.confidence).map(c=>`
+        <div class="list-item">
+          <span class="badge ${c.validated?'b-success':'b-neutral'}" style="width:60px;justify-content:center;">${c.validated?'Validated':'Unvalidated'}</span>
+          <div style="flex:1;">${escapeHtml(c.text)}</div>
+          <input type="range" min="0" max="100" value="${c.confidence}" style="width:90px;" onchange="updateCause('${p.id}','${c.id}','confidence', +this.value)">
+          <span class="badge b-neutral" style="font-family:var(--font-mono);width:42px;justify-content:center;">${c.confidence}%</span>
+          <button class="icon-btn sm" onclick="updateCause('${p.id}','${c.id}','validated', ${!c.validated})" title="Toggle validated"><svg><use href="#ic-check"/></svg></button>
+          <button class="icon-btn btn-danger" onclick="removeCause('${p.id}','${c.id}')"><svg><use href="#ic-trash"/></svg></button>
+        </div>`).join('') || `<div style="padding:14px;color:var(--text-3);font-size:13px;">No candidate causes ranked yet.</div>`}
+    </div>
+    <div class="repeat-add" style="max-width:480px;">
+      <input type="text" id="cause-text-${p.id}" placeholder="Candidate root cause…" onkeydown="if(event.key==='Enter') addCause('${p.id}')">
+      <button class="btn sm btn-primary" onclick="addCause('${p.id}')">Add Cause</button>
+    </div>
+  `;
+}
+function addWhy(pid){ const p=DB.problems.find(p=>p.id===pid); p.rootCause.whys.push({id:uid(),text:''}); p.updatedAt=nowISO(); saveDB(); render(); }
+function removeWhy(pid,id){ const p=DB.problems.find(p=>p.id===pid); p.rootCause.whys=p.rootCause.whys.filter(w=>w.id!==id); p.updatedAt=nowISO(); saveDB(); render(); }
+function updateWhy(pid,id,text){ const p=DB.problems.find(p=>p.id===pid); const w=p.rootCause.whys.find(w=>w.id===id); w.text=text; p.updatedAt=nowISO(); saveDB(); }
+function addFishbone(pid,cat){
+  const inp = document.getElementById(`fb-${cat}-${pid}`); const v = inp.value.trim(); if(!v) return;
+  const p=DB.problems.find(p=>p.id===pid); p.rootCause.fishbone[cat].push({id:uid(),text:v}); p.updatedAt=nowISO(); saveDB(); render();
+}
+function removeFishbone(pid,cat,id){ const p=DB.problems.find(p=>p.id===pid); p.rootCause.fishbone[cat]=p.rootCause.fishbone[cat].filter(i=>i.id!==id); p.updatedAt=nowISO(); saveDB(); render(); }
+function addCause(pid){
+  const inp = document.getElementById(`cause-text-${pid}`); const v = inp.value.trim(); if(!v){ toast('Describe the candidate cause first','warn'); return; }
+  const p=DB.problems.find(p=>p.id===pid); p.rootCause.causes.push({id:uid(),text:v,confidence:50,validated:false}); p.updatedAt=nowISO(); saveDB(); render();
+}
+function removeCause(pid,id){ const p=DB.problems.find(p=>p.id===pid); p.rootCause.causes=p.rootCause.causes.filter(c=>c.id!==id); p.updatedAt=nowISO(); saveDB(); render(); }
+function updateCause(pid,id,field,val){ const p=DB.problems.find(p=>p.id===pid); const c=p.rootCause.causes.find(c=>c.id===id); c[field]=val; p.updatedAt=nowISO(); saveDB(); render(); }
+
+/* ---------- SOLUTIONS TAB ---------- */
+function solutionScore(s){
+  const lv = {Low:1,Medium:2,High:3}[s.cost]||2;
+  const rv = {Low:1,Medium:2,High:3}[s.risk]||2;
+  return Math.round((s.expectedImpact*20 + s.confidence) - (lv*10 + rv*10 + s.difficulty*8));
+}
+function tabSolutions(p){
+  const sols = p.solutions;
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <p style="color:var(--text-2);font-size:13px;margin:0;max-width:520px;">Model candidate solutions, then compare them side by side before deciding.</p>
+      <button class="btn btn-primary sm" onclick="openSolutionModal('${p.id}')"><svg><use href="#ic-plus"/></svg>New Solution</button>
+    </div>
+    ${sols.length===0 ? emptyState('ic-solution','No solutions yet','Add at least one candidate solution to start comparing tradeoffs.') : `
+    <div class="grid grid-cards">
+      ${sols.map(s=>`
+        <div class="card">
+          <div style="font-weight:600;margin-bottom:8px;">${escapeHtml(s.description)}</div>
+          <div class="tag-row" style="margin-bottom:8px;">
+            <span class="badge b-neutral">Cost: ${s.cost}</span><span class="badge b-neutral">Risk: ${s.risk}</span><span class="badge b-neutral">Difficulty: ${s.difficulty}/5</span>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-2);margin-bottom:4px;">Impact ${s.expectedImpact}/5 · Confidence ${s.confidence}% · ${escapeHtml(s.timeRequired||'no estimate')}</div>
+          <div style="font-size:11.5px;color:var(--text-3);">Owner: ${escapeHtml(s.owner||'—')}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+            <span class="badge b-accent">Priority score ${solutionScore(s)}</span>
+            <div style="display:flex;gap:4px;">
+              <button class="icon-btn sm" onclick="openSolutionModal('${p.id}','${s.id}')"><svg><use href="#ic-edit"/></svg></button>
+              <button class="icon-btn btn-danger sm" onclick="deleteSolution('${p.id}','${s.id}')"><svg><use href="#ic-trash"/></svg></button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Compare</div>
+    <div class="card" style="overflow-x:auto;">
+      <table class="compare">
+        <thead><tr><th>Solution</th><th>Cost</th><th>Risk</th><th>Difficulty</th><th>Impact</th><th>Confidence</th><th>Score</th></tr></thead>
+        <tbody>${[...sols].sort((a,b)=>solutionScore(b)-solutionScore(a)).map(s=>`<tr><td>${escapeHtml(s.description)}</td><td>${s.cost}</td><td>${s.risk}</td><td>${s.difficulty}/5</td><td>${s.expectedImpact}/5</td><td>${s.confidence}%</td><td><b>${solutionScore(s)}</b></td></tr>`).join('')}</tbody>
+      </table>
+    </div>`}
+  `;
+}
+function openSolutionModal(problemId, solutionId=null){
+  const p = DB.problems.find(p=>p.id===problemId);
+  const s = solutionId ? p.solutions.find(s=>s.id===solutionId) : null;
+  const body = `
+    <div class="field"><label>Description</label><textarea id="sf-desc" placeholder="Describe this candidate solution">${s?escapeHtml(s.description):''}</textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Cost</label><select id="sf-cost">${['Low','Medium','High'].map(v=>`<option ${(s?s.cost:'Medium')===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label>Risk</label><select id="sf-risk">${['Low','Medium','High'].map(v=>`<option ${(s?s.risk:'Medium')===v?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="field"><label>Difficulty (1–5)</label><input id="sf-diff" type="range" min="1" max="5" value="${s?s.difficulty:3}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Expected Impact (1–5)</label><input id="sf-impact" type="range" min="1" max="5" value="${s?s.expectedImpact:3}"></div>
+      <div class="field"><label>Confidence (%)</label><input id="sf-conf" type="range" min="0" max="100" value="${s?s.confidence:50}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Time Required</label><input id="sf-time" type="text" value="${s?escapeHtml(s.timeRequired||''):''}" placeholder="e.g. 2 weeks"></div>
+      <div class="field"><label>Owner</label><input id="sf-owner" type="text" value="${s?escapeHtml(s.owner||''):'Me'}"></div>
+    </div>
+    <div class="field"><label>Resources Required</label><input id="sf-res" type="text" value="${s?escapeHtml(s.resourcesRequired||''):''}"></div>
+    <div class="field"><label>Dependencies</label><input id="sf-dep" type="text" value="${s?escapeHtml(s.dependencies||''):''}"></div>
+  `;
+  const foot = `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitSolutionForm('${problemId}'${s?`,'${s.id}'`:''})">${s?'Save':'Add solution'}</button>`;
+  openModal(s?'Edit Solution':'New Solution', body, foot, {wide:true});
+}
+function submitSolutionForm(problemId, solutionId=null){
+  const desc = document.getElementById('sf-desc').value.trim();
+  if(!desc){ toast('Describe the solution first','warn'); return; }
+  const vals = {
+    description:desc, cost:document.getElementById('sf-cost').value, risk:document.getElementById('sf-risk').value,
+    difficulty:+document.getElementById('sf-diff').value, expectedImpact:+document.getElementById('sf-impact').value,
+    confidence:+document.getElementById('sf-conf').value, timeRequired:document.getElementById('sf-time').value.trim(),
+    owner:document.getElementById('sf-owner').value.trim(), resourcesRequired:document.getElementById('sf-res').value.trim(),
+    dependencies:document.getElementById('sf-dep').value.trim()
+  };
+  const p = DB.problems.find(p=>p.id===problemId);
+  if(solutionId){ Object.assign(p.solutions.find(s=>s.id===solutionId), vals); toast('Solution updated'); }
+  else { p.solutions.push(Object.assign({id:uid(), createdAt:nowISO()}, vals)); toast('Solution added'); }
+  p.updatedAt = nowISO(); saveDB(); closeModal(); render();
+}
+function deleteSolution(problemId, solutionId){
+  const p = DB.problems.find(p=>p.id===problemId);
+  p.solutions = p.solutions.filter(s=>s.id!==solutionId);
+  p.updatedAt=nowISO(); saveDB(); render();
+}
+
+/* ---------- LINKED TAB ---------- */
+function tabLinked(p){
+  const decs = DB.decisions.filter(d=>d.problemId===p.id);
+  const risks = DB.risks.filter(r=>r.problemId===p.id);
+  return `
+    <div class="section-divider"><span class="dot"></span>Decisions linked to this problem</div>
+    <div style="margin-bottom:10px;"><button class="btn sm btn-primary" onclick="openDecisionModal(null,'${p.id}')"><svg><use href="#ic-plus"/></svg>New Decision</button></div>
+    ${decs.length? `<div class="card divide" style="padding:4px;">${decs.map(d=>`
+      <div class="list-item clickable" onclick="navigate('decision-detail',{selectedDecisionId:'${d.id}'})">
+        <div style="flex:1;"><div class="li-title">${escapeHtml(d.title)}</div><div class="li-meta">Confidence ${d.confidence}%</div></div>
+        ${statusBadge(d.status)}
+      </div>`).join('')}</div>` : `<div style="color:var(--text-3);font-size:13px;">No decisions linked yet.</div>`}
+
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Risks linked to this problem</div>
+    <div style="margin-bottom:10px;"><button class="btn sm btn-primary" onclick="openRiskModal(null,'${p.id}')"><svg><use href="#ic-plus"/></svg>New Risk</button></div>
+    ${risks.length? `<div class="card divide" style="padding:4px;">${risks.map(r=>`
+      <div class="list-item">
+        <div style="flex:1;"><div class="li-title">${escapeHtml(r.title)}</div><div class="li-meta">${r.category}</div></div>
+        <span class="badge" style="background:color-mix(in srgb, ${riskScoreColor(r.probability*r.impact)} 18%, transparent);color:${riskScoreColor(r.probability*r.impact)};">score ${r.probability*r.impact}</span>
+      </div>`).join('')}</div>` : `<div style="color:var(--text-3);font-size:13px;">No risks linked yet.</div>`}
+  `;
+}
+
+/* ---------- 6. DECISIONS MODULE ---------- */
+const DECISION_STATUSES = ['Pending','Reviewed'];
+function renderDecisionsList(){
+  const decs = [...DB.decisions].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div><h1 class="page-title">Decision Journal</h1><p class="page-sub">Every decision, its reasoning, and what actually happened.</p></div>
+      <button class="btn btn-primary" onclick="openDecisionModal()"><svg><use href="#ic-plus"/></svg>New Decision</button>
+    </div>
+    ${decs.length===0 ? emptyState('ic-decision','No decisions logged','Log a decision to track its reasoning, confidence, and outcome over time.', `<button class="btn btn-primary" onclick="openDecisionModal()">New Decision</button>`) :
+    `<div class="card divide" style="padding:4px;">${decs.map(d=>{
+      const prob = DB.problems.find(p=>p.id===d.problemId);
+      return `<div class="list-item clickable" onclick="navigate('decision-detail',{selectedDecisionId:'${d.id}'})">
+        <div style="flex:1;min-width:0;">
+          <div class="li-title">${escapeHtml(d.title)}</div>
+          <div class="li-meta">${prob?escapeHtml(prob.title):'No linked problem'} · confidence ${d.confidence}% ${d.accuracyRating!=null?'· accuracy '+d.accuracyRating+'%':''}</div>
+        </div>
+        ${statusBadge(d.status)}
+      </div>`;
+    }).join('')}</div>`}
+  `;
+}
+function openDecisionModal(id=null, presetProblemId=null){
+  const d = id ? DB.decisions.find(d=>d.id===id) : null;
+  const problemId = d ? d.problemId : presetProblemId;
+  const body = `
+    <div class="field"><label>Decision</label><input id="df-title" type="text" value="${d?escapeHtml(d.title):''}" placeholder="What are you deciding?"></div>
+    <div class="field"><label>Linked Problem (optional)</label>
+      <select id="df-problem" onchange="refreshDecisionSolutionOptions()">
+        <option value="">— None —</option>
+        ${DB.problems.map(p=>`<option value="${p.id}" ${problemId===p.id?'selected':''}>${escapeHtml(p.title)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>Linked Solution (optional)</label><select id="df-solution"></select></div>
+    <div class="field"><label>Reasoning</label><textarea id="df-reason" placeholder="Why this, and not the alternatives?">${d?escapeHtml(d.reasoning):''}</textarea></div>
+    <div class="field"><label>Confidence (%)</label><input id="df-conf" type="range" min="0" max="100" value="${d?d.confidence:60}"></div>
+    <div class="field"><label>Prediction</label><input id="df-pred" type="text" value="${d?escapeHtml(d.prediction):''}" placeholder="What do you expect to happen?"></div>
+    <div class="field"><label>Expected Outcome</label><input id="df-expected" type="text" value="${d?escapeHtml(d.expectedOutcome):''}" placeholder="The measurable result you're aiming for"></div>
+    <div class="field"><label>Review Date</label><input id="df-review" type="date" value="${d?d.reviewDate:''}"></div>
+  `;
+  const foot = `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitDecisionForm(${d?`'${d.id}'`:'null'})">${d?'Save changes':'Log decision'}</button>`;
+  openModal(d?'Edit Decision':'New Decision', body, foot, {wide:true});
+  setTimeout(()=>{ refreshDecisionSolutionOptions(d?d.solutionId:null); },10);
+}
+function refreshDecisionSolutionOptions(selectedSolutionId=null){
+  const pid = document.getElementById('df-problem').value;
+  const sel = document.getElementById('df-solution');
+  const p = DB.problems.find(p=>p.id===pid);
+  const sols = p ? p.solutions : [];
+  sel.innerHTML = `<option value="">— None —</option>` + sols.map(s=>`<option value="${s.id}" ${selectedSolutionId===s.id?'selected':''}>${escapeHtml(s.description.slice(0,60))}</option>`).join('');
+}
+function submitDecisionForm(id){
+  const title = document.getElementById('df-title').value.trim();
+  if(!title){ toast('Give the decision a title first','warn'); return; }
+  const vals = {
+    title, problemId: document.getElementById('df-problem').value || null,
+    solutionId: document.getElementById('df-solution').value || null,
+    reasoning: document.getElementById('df-reason').value.trim(),
+    confidence: +document.getElementById('df-conf').value,
+    prediction: document.getElementById('df-pred').value.trim(),
+    expectedOutcome: document.getElementById('df-expected').value.trim(),
+    reviewDate: document.getElementById('df-review').value,
+  };
+  if(id){ Object.assign(DB.decisions.find(d=>d.id===id), vals, {updatedAt:nowISO()}); toast('Decision updated'); saveDB(); closeModal(); render(); }
+  else { const dec = newDecision(vals); dec.accuracyRating=null; DB.decisions.push(dec); toast('Decision logged'); saveDB(); closeModal(); navigate('decision-detail',{selectedDecisionId:dec.id}); }
+}
+function renderDecisionDetail(){
+  const d = DB.decisions.find(d=>d.id===UI.selectedDecisionId);
+  if(!d){ navigate('decisions'); return ''; }
+  const prob = DB.problems.find(p=>p.id===d.problemId);
+  const html = `
+    <button class="btn sm" style="margin-bottom:14px;" onclick="navigate('decisions')"><svg><use href="#ic-chev-left"/></svg>All decisions</button>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;">
+      <div><h1 class="page-title">${escapeHtml(d.title)}</h1>
+      <div class="tag-row" style="margin-top:6px;">${statusBadge(d.status)}${prob?`<span class="badge b-neutral">→ ${escapeHtml(prob.title)}</span>`:''}</div></div>
+      <div style="display:flex;gap:6px;">
+        <button class="icon-btn" onclick="openDecisionModal('${d.id}')"><svg><use href="#ic-edit"/></svg></button>
+        <button class="icon-btn btn-danger" onclick="deleteDecision('${d.id}')"><svg><use href="#ic-trash"/></svg></button>
+      </div>
+    </div>
+    <div class="grid grid-2" style="margin-top:22px;">
+      <div class="card"><div class="stat-label">Confidence at decision time</div><div class="stat-value" style="font-size:22px;">${d.confidence}%</div></div>
+      <div class="card"><div class="stat-label">Outcome accuracy</div><div class="stat-value" style="font-size:22px;">${d.accuracyRating!=null?d.accuracyRating+'%':'Not reviewed yet'}</div></div>
+    </div>
+    <div class="section-divider"><span class="dot"></span>Reasoning</div>
+    <p style="font-size:13.5px;color:var(--text-2);max-width:680px;">${escapeHtml(d.reasoning)||'—'}</p>
+    <div class="grid grid-2">
+      <div class="field"><label>Prediction</label><div class="card" style="font-size:13px;">${escapeHtml(d.prediction)||'—'}</div></div>
+      <div class="field"><label>Expected Outcome</label><div class="card" style="font-size:13px;">${escapeHtml(d.expectedOutcome)||'—'}</div></div>
+      <div class="field"><label>Actual Outcome</label><div class="card" style="font-size:13px;">${escapeHtml(d.actualOutcome)||'Not recorded yet'}</div></div>
+      <div class="field"><label>Lessons Learned</label><div class="card" style="font-size:13px;">${escapeHtml(d.lessons)||'—'}</div></div>
+    </div>
+    <div style="margin-top:8px;">${d.status==='Pending' ? `<button class="btn btn-primary" onclick="openReviewModal('${d.id}')">Mark as Reviewed</button>` : `<button class="btn" onclick="openReviewModal('${d.id}')">Edit Review</button>`}</div>
+  `;
+  document.getElementById('workspace').innerHTML = html; return html;
+}
+function openReviewModal(id){
+  const d = DB.decisions.find(d=>d.id===id);
+  const body = `
+    <div class="field"><label>Actual Outcome</label><textarea id="rv-actual" placeholder="What actually happened?">${escapeHtml(d.actualOutcome||'')}</textarea></div>
+    <div class="field"><label>Lessons Learned</label><textarea id="rv-lessons" placeholder="What would you do differently?">${escapeHtml(d.lessons||'')}</textarea></div>
+    <div class="field"><label>Outcome Accuracy — how closely did reality match the prediction? (%)</label><input id="rv-acc" type="range" min="0" max="100" value="${d.accuracyRating!=null?d.accuracyRating:50}"></div>
+  `;
+  const foot = `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitReview('${id}')">Save Review</button>`;
+  openModal('Review Decision', body, foot, {wide:true});
+}
+function submitReview(id){
+  const d = DB.decisions.find(d=>d.id===id);
+  d.actualOutcome = document.getElementById('rv-actual').value.trim();
+  d.lessons = document.getElementById('rv-lessons').value.trim();
+  d.accuracyRating = +document.getElementById('rv-acc').value;
+  d.status = 'Reviewed'; d.updatedAt = nowISO();
+  saveDB(); toast('Decision reviewed'); closeModal(); render();
+}
+function deleteDecision(id){
+  confirmDialog('This permanently deletes the decision record.', ()=>{
+    DB.decisions = DB.decisions.filter(d=>d.id!==id); saveDB(); toast('Decision deleted','danger'); navigate('decisions');
+  }, {title:'Delete decision?', confirmLabel:'Delete', danger:true});
+}
+
+/* ---------- 7. RISK REGISTER MODULE ---------- */
+const RISK_CATEGORIES = ['Strategic','Financial','Operational','Technical','Legal','Reputational'];
+const RISK_STATUSES = ['Open','Monitoring','Mitigated','Closed'];
+function riskMatrixHtml(){
+  const risks = DB.risks.filter(r=>r.status!=='Closed');
+  let rows = '';
+  for(let impact=5; impact>=1; impact--){
+    for(let prob=1; prob<=5; prob++){
+      const cellRisks = risks.filter(r=>r.impact===impact && r.probability===prob);
+      const score = impact*prob;
+      const bg = `color-mix(in srgb, ${riskScoreColor(score)} ${cellRisks.length?28:14}%, var(--panel))`;
+      rows += `<div class="risk-cell" style="background:${bg};border:1px solid var(--border-soft);" title="${cellRisks.map(r=>r.title).join(', ')||'No risks'}">${cellRisks.length?`<span class="rc-count">${cellRisks.length}</span>`:score}</div>`;
+    }
+  }
+  return `<div style="display:flex;gap:10px;align-items:flex-start;">
+    <div style="display:flex;flex-direction:column-reverse;justify-content:space-around;font-family:var(--font-mono);font-size:10.5px;color:var(--text-3);padding:2px 0;">${[1,2,3,4,5].map(i=>`<div style="height:1.6em;display:flex;align-items:center;">${i}</div>`).join('')}</div>
+    <div><div class="risk-matrix">${rows}</div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10.5px;color:var(--text-3);margin-top:4px;"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+    <div style="text-align:center;font-size:11px;color:var(--text-3);margin-top:4px;">Probability →</div></div>
+  </div>`;
+}
+function renderRisksList(){
+  const risks = [...DB.risks].sort((a,b)=>(b.probability*b.impact)-(a.probability*a.impact));
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div><h1 class="page-title">Risk Register</h1><p class="page-sub">Every risk, scored by probability × impact, with a mitigation owner.</p></div>
+      <button class="btn btn-primary" onclick="openRiskModal()"><svg><use href="#ic-plus"/></svg>New Risk</button>
+    </div>
+    <div class="section-divider"><span class="dot"></span>Risk matrix <span style="margin-left:4px;">— impact ↑</span></div>
+    <div class="card" style="display:inline-block;">${riskMatrixHtml()}</div>
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>All risks</div>
+    ${risks.length===0? emptyState('ic-risk','No risks logged','Log a risk to track its probability, impact, and mitigation plan.') :
+    `<div class="card divide" style="padding:4px;">${risks.map(r=>{
+      const score = r.probability*r.impact; const prob = DB.problems.find(p=>p.id===r.problemId);
+      return `<div class="list-item">
+        <span class="badge" style="background:color-mix(in srgb, ${riskScoreColor(score)} 18%, transparent);color:${riskScoreColor(score)};width:46px;justify-content:center;">${score}</span>
+        <div style="flex:1;min-width:0;">
+          <div class="li-title">${escapeHtml(r.title)}</div>
+          <div class="li-meta">${r.category}${prob?' · '+escapeHtml(prob.title):''} ${r.mitigation?' · mitigation set':' · no mitigation yet'}</div>
+        </div>
+        ${statusBadge(r.status)}
+        <button class="icon-btn" onclick="openRiskModal('${r.id}')"><svg><use href="#ic-edit"/></svg></button>
+        <button class="icon-btn btn-danger" onclick="deleteRisk('${r.id}')"><svg><use href="#ic-trash"/></svg></button>
+      </div>`;
+    }).join('')}</div>`}
+  `;
+}
+function openRiskModal(id=null, presetProblemId=null){
+  const r = id ? DB.risks.find(r=>r.id===id) : null;
+  const body = `
+    <div class="field"><label>Risk</label><input id="rf-title" type="text" value="${r?escapeHtml(r.title):''}" placeholder="What could go wrong?"></div>
+    <div class="field-row">
+      <div class="field"><label>Category</label><select id="rf-cat">${RISK_CATEGORIES.map(c=>`<option ${(r?r.category:'Operational')===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Status</label><select id="rf-status">${RISK_STATUSES.map(s=>`<option ${(r?r.status:'Open')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Probability (1–5)</label><input id="rf-prob" type="range" min="1" max="5" value="${r?r.probability:3}"></div>
+      <div class="field"><label>Impact (1–5)</label><input id="rf-impact" type="range" min="1" max="5" value="${r?r.impact:3}"></div>
+    </div>
+    <div class="field"><label>Linked Problem (optional)</label>
+      <select id="rf-problem"><option value="">— None —</option>${DB.problems.map(p=>`<option value="${p.id}" ${(r?r.problemId:presetProblemId)===p.id?'selected':''}>${escapeHtml(p.title)}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Mitigation Plan</label><textarea id="rf-mit" placeholder="How will you reduce probability or impact?">${r?escapeHtml(r.mitigation):''}</textarea></div>
+    <div class="field"><label>Owner</label><input id="rf-owner" type="text" value="${r?escapeHtml(r.owner):'Me'}"></div>
+  `;
+  const foot = `<button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="submitRiskForm(${r?`'${r.id}'`:'null'})">${r?'Save changes':'Log risk'}</button>`;
+  openModal(r?'Edit Risk':'New Risk', body, foot, {wide:true});
+}
+function submitRiskForm(id){
+  const title = document.getElementById('rf-title').value.trim();
+  if(!title){ toast('Describe the risk first','warn'); return; }
+  const vals = {
+    title, category:document.getElementById('rf-cat').value, status:document.getElementById('rf-status').value,
+    probability:+document.getElementById('rf-prob').value, impact:+document.getElementById('rf-impact').value,
+    problemId: document.getElementById('rf-problem').value || null,
+    mitigation: document.getElementById('rf-mit').value.trim(), owner: document.getElementById('rf-owner').value.trim()||'Me'
+  };
+  if(id){ Object.assign(DB.risks.find(r=>r.id===id), vals, {updatedAt:nowISO()}); toast('Risk updated'); }
+  else { DB.risks.push(newRisk(vals)); toast('Risk logged'); }
+  saveDB(); closeModal(); render();
+}
+function deleteRisk(id){
+  confirmDialog('This permanently deletes the risk record.', ()=>{
+    DB.risks = DB.risks.filter(r=>r.id!==id); saveDB(); toast('Risk deleted','danger'); render();
+  }, {title:'Delete risk?', confirmLabel:'Delete', danger:true});
+}
+
+/* ---------- 8. SEARCH / COMMAND PALETTE ---------- */
+function openCmdk(){
+  document.getElementById('cmdk-overlay').classList.remove('hidden');
+  const inp = document.getElementById('cmdk-input');
+  inp.value=''; UI.cmdkIndex=0; renderCmdkResults(''); setTimeout(()=>inp.focus(),10);
+}
+function closeCmdk(){ document.getElementById('cmdk-overlay').classList.add('hidden'); }
+function cmdkActions(){
+  return [
+    {label:'New Problem', icon:'ic-plus', run:()=>openProblemModal()},
+    {label:'New Decision', icon:'ic-plus', run:()=>openDecisionModal()},
+    {label:'New Risk', icon:'ic-plus', run:()=>openRiskModal()},
+    {label:'Go to Dashboard', icon:'ic-dashboard', run:()=>navigate('dashboard')},
+    {label:'Go to Problems', icon:'ic-problem', run:()=>navigate('problems')},
+    {label:'Go to Decisions', icon:'ic-decision', run:()=>navigate('decisions')},
+    {label:'Go to Risk Register', icon:'ic-risk', run:()=>navigate('risks')},
+    {label:'Go to Analytics', icon:'ic-graph', run:()=>navigate('analytics')},
+    {label:'Go to Settings', icon:'ic-settings', run:()=>navigate('settings')},
+    {label:'Export workspace as JSON', icon:'ic-export', run:()=>exportJSON()},
+  ];
+}
+function renderCmdkResults(q){
+  q = q.toLowerCase();
+  const actions = cmdkActions().filter(a=>a.label.toLowerCase().includes(q));
+  const probs = DB.problems.filter(p=>p.title.toLowerCase().includes(q)).slice(0,5);
+  const decs = DB.decisions.filter(d=>d.title.toLowerCase().includes(q)).slice(0,4);
+  const risks = DB.risks.filter(r=>r.title.toLowerCase().includes(q)).slice(0,4);
+  let flat = [];
+  let html = '';
+  if(actions.length){ html += `<div class="cmdk-group">Actions</div>`; actions.forEach(a=>{ flat.push(a.run); html += cmdkRow(a.label,a.icon,flat.length-1); }); }
+  if(probs.length){ html += `<div class="cmdk-group">Problems</div>`; probs.forEach(p=>{ flat.push(()=>{closeCmdk();navigate('problem-detail',{selectedProblemId:p.id,problemTab:'overview'});}); html += cmdkRow(p.title,'ic-problem',flat.length-1); }); }
+  if(decs.length){ html += `<div class="cmdk-group">Decisions</div>`; decs.forEach(d=>{ flat.push(()=>{closeCmdk();navigate('decision-detail',{selectedDecisionId:d.id});}); html += cmdkRow(d.title,'ic-decision',flat.length-1); }); }
+  if(risks.length){ html += `<div class="cmdk-group">Risks</div>`; risks.forEach(r=>{ flat.push(()=>{closeCmdk();navigate('risks');}); html += cmdkRow(r.title,'ic-risk',flat.length-1); }); }
+  if(!flat.length) html = `<div style="padding:24px;text-align:center;color:var(--text-3);font-size:13px;">No matches</div>`;
+  document.getElementById('cmdk-results').innerHTML = html;
+  window._cmdkFlat = flat;
+}
+function cmdkRow(label,icon,idx){
+  return `<div class="cmdk-item ${idx===UI.cmdkIndex?'sel':''}" onclick="window._cmdkFlat[${idx}]()"><svg><use href="#${icon}"/></svg><span>${escapeHtml(label)}</span></div>`;
+}
+function exportJSON(){
+  downloadFile(`thinkos-export-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(DB,null,2), 'application/json');
+  toast('Workspace exported as JSON');
+}
+
+/* ---------- 9. SETTINGS MODULE ---------- */
+function renderSettings(){
+  const s = DB.settings;
+  return `
+    <h1 class="page-title">Settings</h1>
+    <p class="page-sub">Theme, accessibility, and your data — all stored locally on this device.</p>
+    <div class="section-divider"><span class="dot"></span>Appearance</div>
+    <div class="card">
+      <div class="settings-row">
+        <div><div class="sr-label">Theme</div><div class="sr-desc">Dark, light, or a high-contrast mode for accessibility.</div></div>
+        <div class="theme-swatch-row">
+          ${['dark','light','contrast'].map(t=>`<div class="theme-swatch ${s.theme===t?'active':''}" style="background:${t==='dark'?'#0A0E14':t==='light'?'#FAFAF8':'#000'};color:${t==='light'?'#1B1F24':'#fff'};" onclick="setTheme('${t}')">${t}</div>`).join('')}
+        </div>
+      </div>
+      <div class="settings-row">
+        <div><div class="sr-label">Color-blind friendly palette</div><div class="sr-desc">Swaps red/green risk and status indicators for a blue/orange/purple safe palette.</div></div>
+        <div class="switch ${s.colorblind?'on':''}" onclick="toggleColorblind()"></div>
+      </div>
+    </div>
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Data</div>
+    <div class="card">
+      <div class="settings-row">
+        <div><div class="sr-label">Export workspace</div><div class="sr-desc">Download every problem, decision, and risk as a JSON file.</div></div>
+        <button class="btn" onclick="exportJSON()"><svg><use href="#ic-export"/></svg>Export JSON</button>
+      </div>
+      <div class="settings-row">
+        <div><div class="sr-label">Import workspace</div><div class="sr-desc">Replace current data with a previously exported JSON file.</div></div>
+        <div><input type="file" accept="application/json" id="import-file" style="display:none" onchange="importJSON(this.files[0])"><button class="btn" onclick="document.getElementById('import-file').click()">Choose file…</button></div>
+      </div>
+      <div class="settings-row">
+        <div><div class="sr-label">Reset all data</div><div class="sr-desc">Permanently erases every problem, decision, and risk in this browser.</div></div>
+        <button class="btn btn-danger" onclick="resetAllData()">Reset workspace</button>
+      </div>
+    </div>
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>About</div>
+    <p style="font-size:12.5px;color:var(--text-3);max-width:560px;">ThinkOS runs entirely in this browser tab — no servers, no accounts, no network calls. Everything you see is stored in this browser's localStorage. Clearing your browser data will erase it, so export regularly if it matters.</p>
+  `;
+}
+function setTheme(t){ DB.settings.theme=t; saveDBRaw(); applyTheme(); render(); }
+function toggleColorblind(){ DB.settings.colorblind=!DB.settings.colorblind; saveDBRaw(); applyTheme(); render(); }
+function resetAllData(){
+  confirmDialog('This erases every problem, decision, and risk permanently. There is no undo. Consider exporting first.', ()=>{
+    localStorage.removeItem(STORAGE_KEY); DB = defaultDB(); saveDBRaw(); toast('Workspace reset','danger'); navigate('dashboard');
+  }, {title:'Reset everything?', confirmLabel:'Erase everything', danger:true});
+}
+async function importJSON(file){
+  if(!file) return;
+  try{
+    const text = await readFileAsText(file);
+    const parsed = JSON.parse(text);
+    if(!parsed.problems || !Array.isArray(parsed.problems)) throw new Error('not a ThinkOS export');
+    DB = parsed;
+    if(!DB.settings) DB.settings = {theme:'dark', colorblind:false};
+    saveDBRaw(); applyTheme(); toast('Workspace imported'); navigate('dashboard');
+  }catch(e){ toast('That file doesn\u2019t look like a ThinkOS export','danger'); }
+}
+
+/* ---------- 10. ANALYTICS MODULE ---------- */
+function barChart(data, opts={}){
+  const max = Math.max(1, ...data.map(d=>d.value));
+  const w = opts.width||560, h=opts.height||140, bw = (w/data.length)-8;
+  let bars = data.map((d,i)=>{
+    const bh = (d.value/max)*(h-24);
+    return `<rect x="${i*(bw+8)}" y="${h-24-bh}" width="${bw}" height="${bh}" rx="3" fill="${opts.color||'var(--accent)'}"></rect>
+      <text x="${i*(bw+8)+bw/2}" y="${h-8}" text-anchor="middle" font-size="10" fill="var(--text-3)" font-family="var(--font-mono)">${d.label}</text>
+      <text x="${i*(bw+8)+bw/2}" y="${h-28-bh<10?12:h-28-bh}" text-anchor="middle" font-size="10" fill="var(--text-2)">${d.value}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px;">${bars}</svg>`;
+}
+function renderAnalytics(){
+  const s = computeWorkspaceStats();
+  const byCat = {};
+  DB.problems.forEach(p=>{ byCat[p.category]=(byCat[p.category]||0)+1; });
+  const catData = Object.entries(byCat).map(([k,v])=>({label:k.slice(0,4),value:v}));
+  const days = [...Array(7)].map((_,i)=>{
+    const d = new Date(); d.setDate(d.getDate()-(6-i));
+    const dayStr = d.toISOString().slice(0,10);
+    const count = [...DB.problems,...DB.decisions,...DB.risks].filter(x=>x.createdAt.slice(0,10)===dayStr).length;
+    return {label:d.toLocaleDateString(undefined,{weekday:'short'}).slice(0,2), value:count};
+  });
+  const reviewed = DB.decisions.filter(d=>d.accuracyRating!=null);
+  return `
+    <h1 class="page-title">Analytics</h1>
+    <p class="page-sub">Trends computed live from your workspace data.</p>
+    <div class="grid grid-stats">
+      <div class="stat-card"><div class="stat-label">Thinking Quality</div><div class="stat-value">${s.thinkingQuality}</div></div>
+      <div class="stat-card"><div class="stat-label">Decision Accuracy</div><div class="stat-value">${s.decisionAccuracy!=null?s.decisionAccuracy:'—'}</div></div>
+      <div class="stat-card"><div class="stat-label">High Risks</div><div class="stat-value">${s.highRisks}</div></div>
+      <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value">${s.monthActivity}</div></div>
+    </div>
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Activity, last 7 days</div>
+    <div class="card">${barChart(days)}</div>
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Problems by category</div>
+    <div class="card">${catData.length?barChart(catData,{color:'var(--info)'}):'<div class="hint">No problems yet.</div>'}</div>
+    <div class="section-divider" style="margin-top:26px;"><span class="dot"></span>Decision review history</div>
+    <div class="card divide" style="padding:4px;">${reviewed.length?reviewed.map(d=>`<div class="list-item"><div style="flex:1;">${escapeHtml(d.title)}</div><span class="badge b-neutral">predicted ${d.confidence}%</span><span class="badge b-accent">actual match ${d.accuracyRating}%</span></div>`).join(''):'<div style="padding:14px;color:var(--text-3);font-size:13px;">No decisions reviewed yet.</div>'}</div>
+  `;
+}
+
+/* ---------- CONTEXT PANEL ---------- */
+function renderContextPanel(){
+  const panel = document.getElementById('context-panel');
+  if(!panel || panel.classList.contains('hidden')) return;
+  let html = `<div class="eyebrow">Context</div>`;
+  if(UI.view==='problem-detail' && currentProblem()){
+    const p = currentProblem();
+    const tq = problemThinkingQuality(p);
+    html += `<h3 style="font-family:var(--font-display);font-size:16px;margin:4px 0 14px;">${escapeHtml(p.title)}</h3>
+      <div style="display:flex;justify-content:center;margin-bottom:14px;">${ringSVG(tq,{size:70,stroke:6})}</div>
+      <div class="settings-row" style="padding:8px 0;"><span class="sr-desc">Assumptions</span><b>${p.decomposition.assumptions.length}</b></div>
+      <div class="settings-row" style="padding:8px 0;"><span class="sr-desc">Ranked causes</span><b>${p.rootCause.causes.length}</b></div>
+      <div class="settings-row" style="padding:8px 0;"><span class="sr-desc">Solutions</span><b>${p.solutions.length}</b></div>
+      <div class="settings-row" style="padding:8px 0;border-bottom:none;"><span class="sr-desc">Linked decisions</span><b>${DB.decisions.filter(d=>d.problemId===p.id).length}</b></div>`;
+  } else {
+    const s = computeWorkspaceStats();
+    html += `<h3 style="font-family:var(--font-display);font-size:16px;margin:4px 0 14px;">Workspace snapshot</h3>
+      <div style="display:flex;justify-content:center;margin-bottom:14px;">${ringSVG(s.thinkingQuality,{size:70,stroke:6})}</div>
+      <p style="font-size:12px;color:var(--text-3);text-align:center;margin-top:-8px;">Overall thinking quality</p>
+      <div class="settings-row" style="padding:8px 0;"><span class="sr-desc">Pending decisions</span><b>${s.pendingDecisions}</b></div>
+      <div class="settings-row" style="padding:8px 0;border-bottom:none;"><span class="sr-desc">High-scoring risks</span><b>${s.highRisks}</b></div>
+      <p style="font-size:12px;color:var(--text-3);margin-top:14px;">Tip: press <kbd style="font-family:var(--font-mono);background:var(--panel-3);padding:1px 5px;border-radius:4px;">Ctrl K</kbd> to jump anywhere.</p>`;
+  }
+  panel.innerHTML = html;
+}
+const _origRender = render;
+render = function(){ _origRender(); renderContextPanel(); };
+
+/* ---------- 11. BOOTSTRAP ---------- */
+function init(){
+  loadDB();
+  applyTheme();
+  render();
+
+  document.getElementById('sidebar-toggle').addEventListener('click', ()=>{
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  });
+  document.getElementById('context-toggle').addEventListener('click', ()=>{
+    const panel = document.getElementById('context-panel');
+    const grid = document.getElementById('main-grid');
+    panel.classList.toggle('hidden');
+    grid.classList.toggle('with-context', !panel.classList.contains('hidden'));
+    renderContextPanel();
+  });
+  document.getElementById('search-trigger').addEventListener('click', openCmdk);
+  document.getElementById('new-problem-sidebar-btn').addEventListener('click', ()=>openProblemModal());
+  document.getElementById('notif-btn').addEventListener('click', ()=>{
+    const s = computeWorkspaceStats();
+    const due = DB.decisions.filter(d=>d.status==='Pending' && d.reviewDate && new Date(d.reviewDate) <= new Date());
+    if(due.length) toast(`${due.length} decision${due.length>1?'s':''} due for review`, 'warn');
+    else if(s.highRisks) toast(`${s.highRisks} risk${s.highRisks>1?'s':''} scoring high — check the Risk Register`, 'danger');
+    else toast('You\u2019re all caught up');
+  });
+  document.getElementById('cmdk-input').addEventListener('input', (e)=>{ UI.cmdkIndex=0; renderCmdkResults(e.target.value); });
+  document.getElementById('cmdk-overlay').addEventListener('click', (e)=>{ if(e.target.id==='cmdk-overlay') closeCmdk(); });
+
+  document.addEventListener('keydown', (e)=>{
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k'){ e.preventDefault(); openCmdk(); return; }
+    if(e.key==='Escape'){
+      if(!document.getElementById('cmdk-overlay').classList.contains('hidden')) closeCmdk();
+      else closeModal();
+      return;
+    }
+    if(!document.getElementById('cmdk-overlay').classList.contains('hidden')){
+      const flat = window._cmdkFlat||[];
+      if(e.key==='ArrowDown'){ e.preventDefault(); UI.cmdkIndex = Math.min(flat.length-1, UI.cmdkIndex+1); renderCmdkResults(document.getElementById('cmdk-input').value); }
+      if(e.key==='ArrowUp'){ e.preventDefault(); UI.cmdkIndex = Math.max(0, UI.cmdkIndex-1); renderCmdkResults(document.getElementById('cmdk-input').value); }
+      if(e.key==='Enter'){ e.preventDefault(); if(flat[UI.cmdkIndex]) flat[UI.cmdkIndex](); }
+    }
+  });
+
+  setInterval(updateStatusBar, 30000);
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
